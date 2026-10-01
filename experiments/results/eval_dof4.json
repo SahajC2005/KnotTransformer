@@ -1,0 +1,13 @@
+{
+  "name": "HELD-OUT 4dof (N=6)",
+  "n_dof": 4,
+  "n_points": 6,
+  "n_total": 500,
+  "n_valid": 500,
+  "n_pred_failed": 0,
+  "n_chord_failed": 0,
+  "acc": 0.464,
+  "median_model": 415.42626649354736,
+  "median_chordal": 395.380533875964,
+  "mean_knot_l1": 0.12845232272012433
+}

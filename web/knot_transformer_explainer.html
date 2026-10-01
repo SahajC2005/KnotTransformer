@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KnotTransformer — How the Pipeline Works</title>
+<style>
+:root {
+  --bg: #fafaf8; --bg2: #f0efeb; --fg: #1a1a1a; --fg2: #666;
+  --bd: #d3d1c7; --blue: #2E86DE; --purple: #7F77DD;
+  --green: #1D9E75; --amber: #EF9F27; --red: #E24B4A;
+  --teal: #5DCAA5; --font: 'Segoe UI', system-ui, sans-serif;
+  --mono: 'SF Mono', 'Fira Code', monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #1a1a1a; --bg2: #2c2c2a; --fg: #e8e6df;
+          --fg2: #9c9a92; --bd: #444441; }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: var(--font); color: var(--fg); background: var(--bg);
+       line-height: 1.7; max-width: 780px; margin: 0 auto; padding: 24px 20px; }
+h1 { font-size: 26px; font-weight: 500; margin: 0 0 6px; }
+h2 { font-size: 18px; font-weight: 500; margin: 40px 0 8px; color: var(--purple); }
+h3 { font-size: 15px; font-weight: 500; margin: 20px 0 6px; }
+p, li { font-size: 15px; color: var(--fg2); margin: 0 0 10px; }
+code { font-family: var(--mono); font-size: 13px; background: var(--bg2);
+       padding: 2px 6px; border-radius: 4px; }
+
+.card { background: var(--bg2); border-radius: var(--radius); padding: 20px 24px;
+        margin: 16px 0; }
+.step-nav { display: flex; justify-content: center; gap: 8px; margin: 20px 0; position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 12px 0; }
+.step-btn { padding: 8px 16px; border: 0.5px solid var(--bd); background: var(--bg);
+            border-radius: 20px; font-size: 13px; cursor: pointer; transition: all .15s;
+            color: var(--fg2); font-family: var(--font); }
+.step-btn:hover { border-color: var(--purple); color: var(--purple); }
+.step-btn.active { background: var(--purple); color: #fff; border-color: var(--purple); }
+
+.vis-area { min-height: 300px; position: relative; margin: 16px 0; }
+
+.tok { display: inline-flex; flex-direction: column; align-items: center;
+       padding: 10px 12px; border-radius: var(--radius);
+       border: 0.5px solid var(--bd); background: var(--bg);
+       min-width: 70px; text-align: center; transition: all .15s; cursor: pointer; }
+.tok:hover { border-color: var(--blue); transform: translateY(-2px); }
+.tok.hi { border-color: var(--blue); background: #E6F1FB; box-shadow: 0 0 0 3px rgba(46,134,222,.15); }
+.tok .label { font-size: 11px; color: var(--fg2); margin: 0 0 3px; }
+.tok .val { font-size: 13px; font-weight: 500; }
+
+.tok-q { border-color: var(--amber); background: #FAEEDA; }
+.tok-q .label { color: #854F0B; }
+.tok-enc { border-color: var(--green); background: #E1F5EE; }
+.tok-enc .label { color: #085041; }
+.tok-out { border-color: var(--purple); background: #EEEDFE; }
+.tok-out .label { color: #3C3489; }
+
+.tok-row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap;
+           margin: 12px 0; }
+.arrow-down { text-align: center; font-size: 22px; color: var(--fg2); margin: 10px 0;
+              line-height: 1; }
+.stage-lbl { display: inline-block; font-size: 12px; color: var(--fg2);
+             background: var(--bg2); padding: 4px 14px; border-radius: 12px; }
+.attn-svg { width: 100%; height: 140px; }
+
+.formula { font-family: var(--mono); font-size: 13px; background: var(--bg2);
+           padding: 14px 18px; border-radius: var(--radius); margin: 12px 0;
+           overflow-x: auto; line-height: 1.8; }
+.hl { color: var(--purple); font-weight: 500; }
+.hl-b { color: var(--blue); font-weight: 500; }
+.hl-a { color: var(--amber); font-weight: 500; }
+.hl-g { color: var(--green); font-weight: 500; }
+.hl-r { color: var(--red); font-weight: 500; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+@media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+.info-box { padding: 12px 16px; border-radius: var(--radius); font-size: 13px; }
+.info-blue { background: #E6F1FB; border-left: 3px solid var(--blue); }
+.info-green { background: #E1F5EE; border-left: 3px solid var(--green); }
+.info-amber { background: #FAEEDA; border-left: 3px solid var(--amber); }
+.info-purple { background: #EEEDFE; border-left: 3px solid var(--purple); }
+
+.attn-demo { position: relative; padding: 20px 0; }
+.attn-canvas { width: 100%; border-radius: var(--radius); }
+.weight-label { position: absolute; font-size: 11px; font-family: var(--mono);
+                color: var(--fg2); pointer-events: none; }
+
+table.clean { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+table.clean th { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--bd);
+                 color: var(--fg2); font-weight: 500; font-size: 12px; }
+table.clean td { padding: 8px 10px; border-bottom: 0.5px solid var(--bd); }
+</style>
+</head>
+<body>
+
+<h1>KnotTransformer pipeline</h1>
+<p>How 4 data points become 2 optimal knots — every step, interactively.</p>
+
+<nav class="step-nav" id="nav"></nav>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="s0">
+<h2>Step 1 — Input: points become tokens</h2>
+<p>Each data point is described by 6 local features, then lifted into a 64-dimensional
+vector. This is the raw material the transformer will process.</p>
+
+<div style="text-align:center"><span class="stage-lbl">4 raw data points</span></div>
+<div class="tok-row">
+  <div class="tok" onclick="hi(this)"><div class="label">D₀</div><div class="val">(0, 0)</div></div>
+  <div class="tok" onclick="hi(this)"><div class="label">D₁</div><div class="val">(1, 0.9)</div></div>
+  <div class="tok" onclick="hi(this)"><div class="label">D₂</div><div class="val">(1.4, −0.7)</div></div>
+  <div class="tok" onclick="hi(this)"><div class="label">D₃</div><div class="val">(3, 0)</div></div>
+</div>
+
+<div class="arrow-down">↓ <span style="font-size:12px">extract 6 features per point</span></div>
+
+<div style="text-align:center"><span class="stage-lbl">4 feature tokens (6 numbers each)</span></div>
+<div class="tok-row">
+  <div class="tok tok-enc"><div class="label">token 0</div><div class="val" style="font-size:10px;font-family:var(--mono)">(0, 0, 0, 1.35, 0, 0)</div></div>
+  <div class="tok tok-enc"><div class="label">token 1</div><div class="val" style="font-size:10px;font-family:var(--mono)">(1, .9, 1.35, 1.65, 0, .33)</div></div>
+  <div class="tok tok-enc"><div class="label">token 2</div><div class="val" style="font-size:10px;font-family:var(--mono)">(1.4, −.7, 1.65, 1.75, 2.1, .67)</div></div>
+  <div class="tok tok-enc"><div class="label">token 3</div><div class="val" style="font-size:10px;font-family:var(--mono)">(3, 0, 1.75, 0, 1.2, 1)</div></div>
+</div>
+
+<div class="arrow-down">↓ <span style="font-size:12px">Linear(6→64) + position embedding</span></div>
+
+<div style="text-align:center"><span class="stage-lbl">4 token vectors (64-d each) — ready for the encoder</span></div>
+<div class="tok-row">
+  <div class="tok tok-enc"><div class="label">h₀</div><div class="val" style="font-size:11px">64-d vector</div></div>
+  <div class="tok tok-enc"><div class="label">h₁</div><div class="val" style="font-size:11px">64-d vector</div></div>
+  <div class="tok tok-enc"><div class="label">h₂</div><div class="val" style="font-size:11px">64-d vector</div></div>
+  <div class="tok tok-enc"><div class="label">h₃</div><div class="val" style="font-size:11px">64-d vector</div></div>
+</div>
+
+<div class="card">
+  <h3>The 6 features</h3>
+  <table class="clean">
+    <tr><th>Feature</th><th>What it captures</th></tr>
+    <tr><td><code>x, y</code></td><td>Raw position of the point</td></tr>
+    <tr><td><code>d_prev</code></td><td>Distance to previous point (0 for first)</td></tr>
+    <tr><td><code>d_next</code></td><td>Distance to next point (0 for last)</td></tr>
+    <tr><td><code>θ</code></td><td>Turning angle at this point (how sharp the bend is)</td></tr>
+    <tr><td><code>k/N</code></td><td>Normalized position in sequence (0 = first, 1 = last)</td></tr>
+  </table>
+  <p style="margin:8px 0 0;font-size:13px">
+    The <b>Linear(6→64)</b> projection lifts each token into the 64-dimensional space where
+    attention operates. The <b>position embedding</b> adds a learned vector per position so
+    the model knows ordering (position 0 vs position 3).
+  </p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="s1">
+<h2>Step 2 — Encoder: points talk to each other</h2>
+<p>3 layers of <b>self-attention</b>. Every point "looks at" every other point and
+updates its representation based on what it learns. Click any point below to see
+its attention pattern.</p>
+
+<div class="attn-demo">
+  <canvas id="attnC" class="attn-canvas" width="720" height="280"></canvas>
+</div>
+<p style="font-size:13px;text-align:center;color:var(--fg2)">
+  Click any point in the top row to see what it attends to. Line thickness = attention weight.
+</p>
+
+<div class="formula">
+  <span class="hl-b">Q</span> = H·W<sub>Q</sub>,  
+  <span class="hl-g">K</span> = H·W<sub>K</sub>,  
+  <span class="hl-a">V</span> = H·W<sub>V</sub><br>
+  Attn(<span class="hl-b">Q</span>,<span class="hl-g">K</span>,<span class="hl-a">V</span>)
+  = softmax(<span class="hl-b">Q</span><span class="hl-g">K</span><sup>T</sup> / √d<sub>k</sub>)
+  · <span class="hl-a">V</span>
+  <span style="color:var(--fg2);font-size:12px">  &nbsp;// d<sub>k</sub> = 64/4 = 16 per head</span>
+</div>
+
+<div class="grid-2">
+  <div class="info-box info-blue">
+    <b>What Q·K<sup>T</sup> computes</b><br>
+    Every pair of points gets a "similarity score." High score = "this other point is
+    relevant to me." The softmax turns scores into weights summing to 1.
+  </div>
+  <div class="info-box info-green">
+    <b>What the output is</b><br>
+    Each point's new vector = weighted average of all points' value vectors. Point D₁ might
+    weight D₂ heavily (sharp turn nearby) and D₀ lightly (far away, gentle region).
+  </div>
+</div>
+
+<div class="card">
+  <h3>After 3 encoder layers</h3>
+  <p>Each point's 64-d vector no longer describes just that point — it describes
+  that point <b>in context of the whole sequence</b>. The encoder probing results confirm
+  this: linear probes recover chord fractions (R²=0.98), turning angles (R²=0.82),
+  and local curvature (R²=0.76) from the encoder output. The model computes these
+  geometric features <em>through attention</em>, not from hand-crafted formulas.</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="s2">
+<h2>Step 3 — Decoder: queries extract the knots</h2>
+<p>The decoder has <b>learned query vectors</b> — blank slots that get filled by attending
+to the encoded points. Each query becomes one knot. Click a query to see its cross-attention.</p>
+
+<div class="attn-demo">
+  <canvas id="crossC" class="attn-canvas" width="720" height="320"></canvas>
+</div>
+<p style="font-size:13px;text-align:center;color:var(--fg2)">
+  Click any query (amber) to see which encoded points (green) it attends to.
+</p>
+
+<div class="grid-2">
+  <div class="info-box info-amber">
+    <b>Self-attention among queries</b><br>
+    Queries coordinate with each other: "You're covering the first third of the curve,
+    I'll handle the middle." This prevents knots from bunching up.
+  </div>
+  <div class="info-box info-purple">
+    <b>Cross-attention to encoder</b><br>
+    Each query looks at the encoded points and asks: "What geometry do I need?" A query
+    for the middle of the curve might attend heavily to the points where the sharpest
+    turn happens.
+  </div>
+</div>
+
+<div class="card">
+  <h3>Why DETR-style queries?</h3>
+  <p>This architecture comes from DETR (object detection). There, queries become
+  bounding boxes. Here, queries become knots. The key property: the number of
+  queries is fixed (K<sub>max</sub>+1 = 7), but the number of <em>used</em> queries
+  varies per sample. A 4-point input uses 3 queries (K=2 knots + 1 slack); a
+  6-point input uses 5. <b>Padding masks</b> handle this naturally.</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="s3">
+<h2>Step 4 — Knot head: scores become ordered knots</h2>
+<p>Each decoded query produces a raw scalar. The output head turns these into valid,
+<b>strictly ordered</b> knots in (0,1).</p>
+
+<div class="card" style="text-align:center">
+  <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 0 12px">
+    <div class="tok tok-q"><div class="label">query 0</div><div class="val">64-d</div></div>
+    <div class="tok tok-q"><div class="label">query 1</div><div class="val">64-d</div></div>
+    <div class="tok tok-q"><div class="label">query 2 (slack)</div><div class="val">64-d</div></div>
+  </div>
+  <div class="arrow-down">↓ MLP: 64→32→1 per query</div>
+  <div id="knotDemo" style="margin:12px 0"></div>
+</div>
+
+<div class="formula">
+  <b>Step A:</b> raw scores <span class="hl-r">r</span> = MLP(decoded_query)<br>
+  <b>Step B:</b> <span class="hl-a">s<sub>i</sub></span> = softplus(<span class="hl-r">r<sub>i</sub></span>) + ε
+  <span style="color:var(--fg2)"> &nbsp;// strictly positive increments</span><br>
+  <b>Step C:</b> <span class="hl-g">c<sub>i</sub></span> = Σ<sub>j≤i</sub> <span class="hl-a">s<sub>j</sub></span>
+  <span style="color:var(--fg2)"> &nbsp;// cumulative sum → automatically increasing</span><br>
+  <b>Step D:</b> <span class="hl">u<sub>i</sub></span> = <span class="hl-g">c<sub>i</sub></span> / <span class="hl-g">c<sub>K+1</sub></span>
+  <span style="color:var(--fg2)"> &nbsp;// normalize → all in (0, 1), last slot is the "slack"</span>
+</div>
+
+<div class="info-box info-purple" style="margin:12px 0">
+  <b>Why this guarantees valid knots:</b>
+  softplus is always positive → every increment s<sub>i</sub> > 0 →
+  cumsum is strictly increasing → division by total maps to (0,1).
+  No sorting needed. The ordering is <em>by construction</em>.
+</div>
+
+<div id="knotSliderArea" style="margin:16px 0">
+  <p style="font-size:13px;margin:0 0 8px">Drag the raw scores to see how the output head transforms them into ordered knots:</p>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin:0 0 8px">
+    <label style="font-size:13px;color:var(--fg2)">r₀ <input type="range" min="-30" max="30" value="5" step="1" id="r0" oninput="updateKnots()" style="width:100px"></label>
+    <label style="font-size:13px;color:var(--fg2)">r₁ <input type="range" min="-30" max="30" value="-2" step="1" id="r1" oninput="updateKnots()" style="width:100px"></label>
+    <label style="font-size:13px;color:var(--fg2)">r₂ (slack) <input type="range" min="-30" max="30" value="8" step="1" id="r2" oninput="updateKnots()" style="width:100px"></label>
+  </div>
+  <div id="knotOut" style="font-family:var(--mono);font-size:13px"></div>
+  <canvas id="knotBar" width="700" height="50" style="width:100%;margin:8px 0"></canvas>
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<section id="s4">
+<h2>Step 5 — The full pipeline: forward and backward</h2>
+<p>Everything connects into one differentiable chain. The forward pass computes the
+curve and its energy. The backward pass sends gradients all the way back through the
+solver to teach the attention layers.</p>
+
+<div class="card" style="overflow-x:auto">
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:650px;justify-content:center">
+  <div class="tok"><div class="label">points</div><div class="val">D</div></div>
+  <span style="font-size:18px;color:var(--fg2)">→</span>
+  <div class="tok tok-enc"><div class="label">encoder</div><div class="val">×3</div></div>
+  <span style="font-size:18px;color:var(--fg2)">→</span>
+  <div class="tok tok-q"><div class="label">decoder</div><div class="val">×3</div></div>
+  <span style="font-size:18px;color:var(--fg2)">→</span>
+  <div class="tok tok-out"><div class="label">knot head</div><div class="val">u</div></div>
+  <span style="font-size:18px;color:var(--fg2)">→</span>
+  <div class="tok" style="border-color:var(--green)"><div class="label">solve</div><div class="val">AP=D̃</div></div>
+  <span style="font-size:18px;color:var(--fg2)">→</span>
+  <div class="tok" style="border-color:var(--red)"><div class="label">energy</div><div class="val">E(u)</div></div>
+</div>
+<div style="text-align:center;margin:12px 0 0;font-size:13px;color:var(--red)">
+  ← ← ← ∇<sub>θ</sub>E flows backward through everything ← ← ←
+</div>
+</div>
+
+<h3>The gradient chain (backward pass)</h3>
+<div class="formula">
+  ∂E/∂θ = <span class="hl-r">∂E/∂u</span> · <span class="hl">∂u/∂θ</span><br><br>
+  <span class="hl">∂u/∂θ</span> = standard backprop through transformer
+  <span style="color:var(--fg2)"> &nbsp;// PyTorch does this automatically</span><br><br>
+  <span class="hl-r">∂E/∂u</span> requires differentiating through the linear solve:<br>
+  &nbsp;&nbsp;A(u)·P = D̃  →  <span class="hl-g">∂P/∂u<sub>k</sub> = −A<sup>−1</sup> · (∂A/∂u<sub>k</sub>) · P</span>
+  <span style="color:var(--fg2)"> &nbsp;// implicit differentiation</span>
+</div>
+
+<div class="grid-2">
+  <div class="info-box info-green">
+    <b>Why implicit differentiation?</b><br>
+    The control points P are defined implicitly by AP = D̃. When a knot u<sub>k</sub> changes,
+    A changes, and P must adjust to keep AP = D̃. The formula tells us exactly how much P
+    moves per unit change in u<sub>k</sub>.
+  </div>
+  <div class="info-box" style="background:#FCEBEB;border-left:3px solid var(--red)">
+    <b>Self-supervised: no labels needed</b><br>
+    The loss is just E — the curvature of the curve the model produced. Low curvature =
+    good, high curvature = bad. The curve grades itself. Every step from knots to energy
+    is differentiable, so the gradient flows all the way back to the attention weights.
+  </div>
+</div>
+
+<h3>What each component learns</h3>
+<table class="clean">
+  <tr><th>Component</th><th>What it learns</th><th>Evidence</th></tr>
+  <tr><td><b>Encoder</b></td><td>Geometric features: chord fractions, turning angles, local curvature</td>
+      <td>Linear probing R² = 0.76–1.00</td></tr>
+  <tr><td><b>Decoder queries</b></td><td>"I am knot position k" — each query specializes to a region of the curve</td>
+      <td>Different queries attend to different point subsets</td></tr>
+  <tr><td><b>Knot head</b></td><td>How to translate geometric context into optimal spacing</td>
+      <td>Phase 2 loss drops from 408 → 168 over 300 epochs</td></tr>
+  <tr><td><b>The whole model</b></td><td>Length-invariant geometric reasoning</td>
+      <td>Trained on N∈{4,5}, wins 72–80% on unseen N=6</td></tr>
+</table>
+</section>
+
+<script>
+// Navigation
+var secs=['s0','s1','s2','s3','s4'];
+var labels=['Input','Encoder','Decoder','Output','Full pipeline'];
+var nav=document.getElementById('nav');
+labels.forEach(function(l,i){
+  var b=document.createElement('button');
+  b.className='step-btn'+(i===0?' active':'');
+  b.textContent=l;
+  b.onclick=function(){
+    document.getElementById(secs[i]).scrollIntoView({behavior:'smooth',block:'start'});
+    document.querySelectorAll('.step-btn').forEach(function(x){x.classList.remove('active')});
+    b.classList.add('active');
+  };
+  nav.appendChild(b);
+});
+
+// Highlight tokens on click
+function hi(el){
+  el.parentNode.querySelectorAll('.tok').forEach(function(t){t.classList.remove('hi')});
+  el.classList.add('hi');
+}
+
+// Encoder self-attention demo
+var ac=document.getElementById('attnC'), ax=ac.getContext('2d');
+var pts=[{x:120,y:40,l:'h₀'},{x:280,y:40,l:'h₁'},{x:440,y:40,l:'h₂'},{x:600,y:40,l:'h₃'}];
+var weights=[
+  [0.15, 0.35, 0.30, 0.20],
+  [0.10, 0.20, 0.45, 0.25],
+  [0.05, 0.40, 0.15, 0.40],
+  [0.20, 0.25, 0.35, 0.20]
+];
+var selEnc=1;
+function drawAttn(){
+  ax.clearRect(0,0,ac.width,ac.height);
+  var dark=matchMedia('(prefers-color-scheme:dark)').matches;
+  var fg=dark?'#e8e6df':'#1a1a1a';
+  var fg2=dark?'#9c9a92':'#666';
+  // "Before" row
+  ax.font='500 12px '+getComputedStyle(document.body).fontFamily;
+  ax.fillStyle=fg2; ax.textAlign='center';
+  ax.fillText('Before attention (input tokens)',360,20);
+  pts.forEach(function(p,i){
+    ax.fillStyle=i===selEnc?(dark?'#1D9E75':'#1D9E75'):(dark?'#444':'#f0efeb');
+    ax.strokeStyle=i===selEnc?'#1D9E75':'#888';
+    ax.lineWidth=i===selEnc?2:0.5;
+    ax.beginPath(); ax.roundRect(p.x-35,p.y,70,36,6); ax.fill(); ax.stroke();
+    ax.fillStyle=i===selEnc?'#fff':fg;
+    ax.font='500 13px '+getComputedStyle(document.body).fontFamily;
+    ax.fillText(p.l,p.x,p.y+22);
+  });
+  // Attention lines
+  var w=weights[selEnc];
+  for(var j=0;j<4;j++){
+    var lw=w[j]*8;
+    if(lw<0.3)continue;
+    ax.strokeStyle='rgba(239,159,39,'+(0.3+w[j]*0.7)+')';
+    ax.lineWidth=lw;
+    ax.beginPath();
+    var sy=pts[selEnc].y+36, ey=180;
+    var sx=pts[selEnc].x, ex=pts[j].x;
+    var cy1=sy+40, cy2=ey-40;
+    ax.moveTo(sx,sy);
+    ax.bezierCurveTo(sx,cy1,ex,cy2,ex,ey);
+    ax.stroke();
+    ax.fillStyle=fg2; ax.font='11px '+getComputedStyle(document.body).fontFamily;
+    ax.fillText((w[j]*100).toFixed(0)+'%',(sx+ex)/2+(j<selEnc?-18:18),
+                (sy+ey)/2+(j===selEnc?-8:0));
+  }
+  // "After" row
+  ax.fillStyle=fg2; ax.font='500 12px '+getComputedStyle(document.body).fontFamily;
+  ax.fillText('After attention (updated vectors)',360,170);
+  pts.forEach(function(p,i){
+    var y2=180;
+    ax.fillStyle=dark?'#2c2c2a':'#fff';
+    ax.strokeStyle=i===selEnc?'#EF9F27':'#888';
+    ax.lineWidth=i===selEnc?2:0.5;
+    ax.beginPath(); ax.roundRect(p.x-35,y2,70,36,6); ax.fill(); ax.stroke();
+    ax.fillStyle=fg;
+    ax.font='500 13px '+getComputedStyle(document.body).fontFamily;
+    ax.fillText(p.l+"'",p.x,y2+22);
+    if(i===selEnc){
+      ax.fillStyle=fg2; ax.font='10px '+getComputedStyle(document.body).fontFamily;
+      ax.fillText('= weighted avg',p.x,y2+50);
+      ax.fillText('of all values',p.x,y2+62);
+    }
+  });
+  // Click targets
+  ax.fillStyle='transparent';
+  pts.forEach(function(p,i){
+    ax.beginPath(); ax.rect(p.x-40,p.y-5,80,46);
+  });
+}
+ac.onclick=function(e){
+  var rect=ac.getBoundingClientRect();
+  var scale=ac.width/rect.width;
+  var mx=(e.clientX-rect.left)*scale;
+  for(var i=0;i<pts.length;i++){
+    if(Math.abs(mx-pts[i].x)<45){selEnc=i;drawAttn();return;}
+  }
+};
+drawAttn();
+
+// Decoder cross-attention demo
+var cc=document.getElementById('crossC'), cx2=cc.getContext('2d');
+var queries=[{x:140,y:30,l:'query₀'},{x:360,y:30,l:'query₁'},{x:580,y:30,l:'query₂ (slack)'}];
+var encPts=[{x:90,y:240,l:'enc₀'},{x:260,y:240,l:'enc₁'},{x:430,y:240,l:'enc₂'},{x:600,y:240,l:'enc₃'}];
+var crossW=[
+  [0.45, 0.35, 0.15, 0.05],
+  [0.05, 0.20, 0.40, 0.35],
+  [0.10, 0.10, 0.25, 0.55]
+];
+var selDec=0;
+function drawCross(){
+  cx2.clearRect(0,0,cc.width,cc.height);
+  var dark=matchMedia('(prefers-color-scheme:dark)').matches;
+  var fg=dark?'#e8e6df':'#1a1a1a';
+  var fg2=dark?'#9c9a92':'#666';
+  cx2.fillStyle=fg2; cx2.textAlign='center';
+  cx2.font='500 12px '+getComputedStyle(document.body).fontFamily;
+  cx2.fillText('Decoder queries (learned)',360,18);
+  queries.forEach(function(q,i){
+    cx2.fillStyle=i===selDec?'#EF9F27':(dark?'#444':'#FAEEDA');
+    cx2.strokeStyle=i===selDec?'#BA7517':'#ccc';
+    cx2.lineWidth=i===selDec?2:0.5;
+    cx2.beginPath(); cx2.roundRect(q.x-50,q.y,100,36,6); cx2.fill(); cx2.stroke();
+    cx2.fillStyle=i===selDec?'#fff':(dark?'#e8e6df':'#854F0B');
+    cx2.font='500 12px '+getComputedStyle(document.body).fontFamily;
+    cx2.fillText(q.l,q.x,q.y+22);
+  });
+  // Cross-attention lines
+  var w=crossW[selDec];
+  for(var j=0;j<4;j++){
+    var lw=w[j]*8;
+    if(lw<0.3)continue;
+    cx2.strokeStyle='rgba(127,119,221,'+(0.3+w[j]*0.7)+')';
+    cx2.lineWidth=lw;
+    cx2.beginPath();
+    cx2.moveTo(queries[selDec].x,queries[selDec].y+36);
+    cx2.bezierCurveTo(queries[selDec].x,130,encPts[j].x,170,encPts[j].x,encPts[j].y);
+    cx2.stroke();
+    cx2.fillStyle=fg2; cx2.font='11px '+getComputedStyle(document.body).fontFamily;
+    cx2.fillText((w[j]*100).toFixed(0)+'%',
+      (queries[selDec].x+encPts[j].x)/2,145);
+  }
+  // Encoded points
+  cx2.fillStyle=fg2; cx2.font='500 12px '+getComputedStyle(document.body).fontFamily;
+  cx2.fillText('Encoded points (from encoder)',360,228);
+  encPts.forEach(function(p){
+    cx2.fillStyle=dark?'#085041':'#E1F5EE';
+    cx2.strokeStyle='#1D9E75'; cx2.lineWidth=0.5;
+    cx2.beginPath(); cx2.roundRect(p.x-40,p.y,80,36,6); cx2.fill(); cx2.stroke();
+    cx2.fillStyle=dark?'#9FE1CB':'#085041';
+    cx2.font='500 12px '+getComputedStyle(document.body).fontFamily;
+    cx2.fillText(p.l,p.x,p.y+22);
+  });
+  // Interpretation
+  var interp=['Attends to the first half of the curve — placing the early knot.',
+              'Attends to the second half — placing the later knot.',
+              'Slack query — captures remaining parameter range after the last knot.'];
+  cx2.fillStyle=fg2; cx2.font='12px '+getComputedStyle(document.body).fontFamily;
+  cx2.fillText(interp[selDec],360,300);
+}
+cc.onclick=function(e){
+  var rect=cc.getBoundingClientRect();
+  var scale=cc.width/rect.width;
+  var mx=(e.clientX-rect.left)*scale;
+  for(var i=0;i<queries.length;i++){
+    if(Math.abs(mx-queries[i].x)<55){selDec=i;drawCross();return;}
+  }
+};
+drawCross();
+
+// Knot head demo
+function softplus(x){return Math.log(1+Math.exp(x/10))*10}
+function updateKnots(){
+  var r0=+document.getElementById('r0').value/10;
+  var r1=+document.getElementById('r1').value/10;
+  var r2=+document.getElementById('r2').value/10;
+  var s0=softplus(r0)+0.001, s1=softplus(r1)+0.001, s2=softplus(r2)+0.001;
+  var c0=s0, c1=s0+s1, c2=s0+s1+s2;
+  var u0=c0/c2, u1=c1/c2;
+  var out=document.getElementById('knotOut');
+  out.innerHTML=
+    '<span style="color:var(--red)">raw:</span> r = ['+r0.toFixed(1)+', '+r1.toFixed(1)+', '+r2.toFixed(1)+'] → '+
+    '<span style="color:var(--amber)">softplus:</span> s = ['+s0.toFixed(2)+', '+s1.toFixed(2)+', '+s2.toFixed(2)+'] → '+
+    '<span style="color:var(--green)">cumsum:</span> c = ['+c0.toFixed(2)+', '+c1.toFixed(2)+', '+c2.toFixed(2)+'] → '+
+    '<span style="color:var(--purple)"><b>knots: u = ['+u0.toFixed(3)+', '+u1.toFixed(3)+']</b></span>';
+  // Draw bar
+  var cv=document.getElementById('knotBar'), ctx=cv.getContext('2d');
+  var dark=matchMedia('(prefers-color-scheme:dark)').matches;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  var ml=20,mr=20,y=15,h=20,w=cv.width-ml-mr;
+  ctx.fillStyle=dark?'#2c2c2a':'#f0efeb';
+  ctx.beginPath(); ctx.roundRect(ml,y,w,h,4); ctx.fill();
+  ctx.strokeStyle=dark?'#444':'#ccc'; ctx.lineWidth=0.5;
+  ctx.beginPath(); ctx.roundRect(ml,y,w,h,4); ctx.stroke();
+  // Knot markers
+  [u0,u1].forEach(function(u,i){
+    var x=ml+u*w;
+    ctx.fillStyle='#7F77DD'; ctx.beginPath();
+    ctx.arc(x,y+h/2,6,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=dark?'#e8e6df':'#1a1a1a';
+    ctx.font='500 11px '+getComputedStyle(document.body).fontFamily;
+    ctx.textAlign='center';
+    ctx.fillText('u₊'+(i+1)+' = '+u.toFixed(3),x,y+h+16);
+  });
+  ctx.fillStyle=dark?'#9c9a92':'#666';
+  ctx.font='11px '+getComputedStyle(document.body).fontFamily;
+  ctx.textAlign='left'; ctx.fillText('0',ml,y+h+16);
+  ctx.textAlign='right'; ctx.fillText('1',ml+w,y+h+16);
+}
+updateKnots();
+
+// Handle dark mode changes
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){
+  drawAttn(); drawCross(); updateKnots();
+});
+</script>
+</body>
+</html>

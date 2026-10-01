@@ -1,0 +1,33 @@
+# KnotTransformer — B-spline parameterisation with transformers
+# Install with: pip install -r requirements.txt
+#
+# GPU (CUDA 11.8) — recommended for Phase 2 training:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu118
+#   pip install -r requirements.txt
+#
+# GPU (CUDA 12.1):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements.txt
+#
+# CPU only (slower Phase 2, fine for inference and Phase 1):
+#   pip install -r requirements.txt
+
+# ── Core deep learning ────────────────────────────────────────────────────────
+torch>=2.1.0                  # transformer, autograd through B-spline solver
+numpy>=1.24.0                 # dataset generation, feature engineering
+
+# ── Plotting & visualisation ──────────────────────────────────────────────────
+matplotlib>=3.7.0             # all figures: attention maps, loss curves, splines
+
+# ── Interpretability tools ────────────────────────────────────────────────────
+scikit-learn>=1.3.0           # Tool 2: linear probing (Ridge regression, R²)
+scipy>=1.11.0                 # Tool 5: Spearman ρ for latent space analysis
+umap-learn>=0.5.5             # Tool 5: UMAP projection of encoder representations
+                              # (falls back to PCA if not installed)
+
+# ── Notebook support (optional, for running .ipynb files) ────────────────────
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# ── Development utilities (optional) ─────────────────────────────────────────
+tqdm>=4.65.0                  # progress bars during training loops

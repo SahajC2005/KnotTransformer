@@ -1,0 +1,13 @@
+{
+  "name": "in-dist 3dof (N=5)",
+  "n_dof": 3,
+  "n_points": 5,
+  "n_total": 500,
+  "n_valid": 500,
+  "n_pred_failed": 0,
+  "n_chord_failed": 0,
+  "acc": 0.446,
+  "median_model": 296.9982500261225,
+  "median_chordal": 284.8325404470122,
+  "mean_knot_l1": 0.0814328573830018
+}

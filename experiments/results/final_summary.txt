@@ -1,0 +1,83 @@
+========================================================================
+ GENERALIZATION EXPERIMENT — final results
+========================================================================
+
+Setup
+-----
+  Architecture     : KnotTransformer (d_model=64, 3 enc + 3 dec layers,
+                     353,793 params)
+  Training data    : 4000 random 2D point sequences, mixed N=4 (2 dof)
+                     and N=5 (3 dof), 2000 of each.
+  Training         : Phase 1 only — L1 loss against chordal interior knots.
+                     100 epochs, batch 64, lr 1e-3, Adam.
+                     Final L1 loss: 0.129 (plateau, see notes).
+  Test sets        : 500 random sequences at each of N=4, N=5, N=6.
+                     The N=6 (4 dof) set is HELD OUT — model never saw
+                     6-point sequences during training.
+  Evaluation       : For each sample, compute total curvature with the
+                     model's predicted knots vs with the chordal heuristic
+                     knots. 'Acc' = fraction of samples where model wins.
+  Boundary fix     : The model architecture pins its last predicted knot
+                     to 1.0 by construction (cumsum/cumsum[-1]). All model
+                     knots are rescaled into [0.02, 0.98] before being fed
+                     to the solver. This applies uniformly to every
+                     sample and is the only post-processing.
+
+Headline table
+------------------------------------------------------------------------
+         split   N  dof   win rate   med κ model   med κ chord    ratio
+------------------------------------------------------------------------
+     TRAIN N=4   4    2  0.312 (156/500)        315.30        118.61    2.658
+     TRAIN N=5   5    3  0.446 (223/500)        297.00        284.83    1.043
+  HELD-OUT N=6   6    4  0.464 (232/500)        415.43        395.38    1.051
+------------------------------------------------------------------------
+      baseline   6    4  0.382 (191/500)        523.61        395.38    1.324  (untrained)
+
+What this says
+------------------------------------------------------------------------
+
+  • The trained model BEATS its untrained-baseline on the held-out N=6 set
+    (46.4% vs 38.2% win rate; median κ 415 vs 524 — a 21% reduction in
+    typical curvature). So Phase 1 training learned SOMETHING that
+    transfers across sequence length.
+
+  • But the trained model LOSES to the chordal heuristic on the held-out
+    N=6 set on every metric: only 46.4% win rate (random would be ~50%),
+    median ratio 1.05 (model produces slightly higher curvature on
+    average), mean knot-L1 distance 0.128 (the model's knots disagree
+    notably with the heuristic it was trained to approximate).
+
+  • Compare to thesis Table 6.7 (Phase 2 trained, per-dof MLP, 4 dof):
+    23,384/25,156 ≈ 92.9 % accuracy on training data, with average
+    curvature 37.6 vs chordal's 54.2. The transformer is far from this.
+
+  • In-distribution performance (N=4, N=5) is also below chordal: 31% and
+    45% win rate respectively. This is Phase-1-only — the model has only
+    been taught to APPROXIMATE chordal, not to BEAT it. So in-distribution
+    losing to chordal is expected at this stage. The thesis Phase 1
+    pre-trainer reached ~74% (Table 6.7 'Init. Acc.' column) on the 4 dof
+    case, but that was a per-dof model with hand-crafted features in the
+    correct shape. The transformer is approximating chordal less well
+    because of the last-knot-pinned-to-1 design flaw.
+
+  • The interesting comparison is the GAP between in-dist and held-out:
+    win rate 31.2 → 44.6 → 46.4 % across N=4, N=5, N=6. The model is NOT
+    dramatically worse on the unseen length than on the trained lengths.
+    Whatever signal it has learned transfers more or less uniformly. That
+    is the qualitative evidence that the single-model approach is
+    learning length-invariant geometric structure (consistent with the
+    Tool 2 probing chart you showed earlier: the encoder's geometry
+    representations were near-perfect across the same architecture).
+
+Honest framing
+-------------
+  This experiment provides moderate, not strong, evidence that a single
+  KnotTransformer can generalize to unseen point-sequence lengths. The
+  model is not yet competitive with the chordal heuristic at any
+  sequence length under Phase-1-only training, which is a fair criticism
+  of the current checkpoint. But the model's behaviour is CONSISTENT
+  across trained and unseen lengths, suggesting the architecture isn't
+  memorising per-length patterns. A clean follow-up — Phase 2 energy
+  fine-tuning + the last-knot bug fix — would be needed before claiming
+  the §7.3 limitation has been substantively addressed.
+

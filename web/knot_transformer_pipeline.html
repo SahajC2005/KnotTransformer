@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KnotTransformer — Interactive Pipeline</title>
+<style>
+:root{--bg:#fafaf8;--bg2:#f0efeb;--bg3:#e8e6df;--fg:#1a1a1a;--fg2:#73726c;--bd:#d3d1c7;
+--blue:#2E86DE;--purple:#7F77DD;--green:#1D9E75;--amber:#EF9F27;--red:#E24B4A;
+--teal:#5DCAA5;--r:10px;--font:'Segoe UI',system-ui,sans-serif;--mono:'SF Mono',monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--bg2:#2c2c2a;--bg3:#3d3d3a;
+--fg:#e8e6df;--fg2:#9c9a92;--bd:#555}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);color:var(--fg);background:var(--bg);max-width:760px;margin:0 auto;padding:20px;line-height:1.6}
+h1{font-size:24px;font-weight:500;margin:0 0 4px}
+h2{font-size:18px;font-weight:500;color:var(--purple);margin:36px 0 8px;padding-top:12px;border-top:0.5px solid var(--bd)}
+h3{font-size:15px;font-weight:500;margin:16px 0 6px}
+p{font-size:14px;color:var(--fg2);margin:0 0 10px}
+.card{background:var(--bg2);border-radius:var(--r);padding:16px 20px;margin:12px 0}
+.mono{font-family:var(--mono);font-size:12px}
+.hl{color:var(--purple);font-weight:500}
+.hl-b{color:var(--blue);font-weight:500}
+.hl-g{color:var(--green);font-weight:500}
+.hl-a{color:var(--amber);font-weight:500}
+.hl-r{color:var(--red);font-weight:500}
+canvas{display:block;width:100%;border-radius:var(--r);border:0.5px solid var(--bd);margin:8px 0}
+.hint{font-size:12px;color:var(--fg2);text-align:center;margin:2px 0 8px}
+.formula{font-family:var(--mono);font-size:12px;background:var(--bg2);padding:12px 16px;border-radius:var(--r);margin:10px 0;line-height:1.9;overflow-x:auto}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+@media(max-width:550px){.grid{grid-template-columns:1fr}}
+.info{padding:10px 14px;border-radius:var(--r);font-size:13px;line-height:1.6}
+.ib{background:#E6F1FB;border-left:3px solid var(--blue)}
+.ig{background:#E1F5EE;border-left:3px solid var(--green)}
+.ia{background:#FAEEDA;border-left:3px solid var(--amber)}
+.ip{background:#EEEDFE;border-left:3px solid var(--purple)}
+.ir{background:#FCEBEB;border-left:3px solid var(--red)}
+nav{position:sticky;top:0;z-index:9;background:var(--bg);padding:10px 0;display:flex;gap:6px;flex-wrap:wrap;justify-content:center;border-bottom:0.5px solid var(--bd);margin:0 0 8px}
+nav a{padding:6px 14px;border-radius:16px;font-size:13px;text-decoration:none;color:var(--fg2);border:0.5px solid var(--bd);transition:.15s}
+nav a:hover{border-color:var(--purple);color:var(--purple)}
+</style>
+</head>
+<body>
+
+<h1>How the KnotTransformer works</h1>
+<p>Click through each stage. Every number is real; every attention pattern is interactive.</p>
+
+<nav>
+<a href="#s1">1. Input</a>
+<a href="#s2">2. Encoder</a>
+<a href="#s3">3. Decoder</a>
+<a href="#s4">4. Output</a>
+<a href="#s5">5. Full chain</a>
+</nav>
+
+<!-- ════════════════════════════════════════════════════ STEP 1 -->
+<section id="s1">
+<h2>Step 1 — Points become tokens</h2>
+<p>Each of 6 data points gets described by 6 local features, then projected into a 64-dimensional vector.</p>
+<canvas id="c1" height="420"></canvas>
+<p class="hint">Each column is one point. The 6 features capture position, distances, turning angle, and sequence position.</p>
+<div class="card">
+<h3>Why 6 features?</h3>
+<p>Raw (x,y) alone doesn't tell the model if a point is at a sharp bend or a gentle curve. The distances and turning angle add local geometric context. The position k/N adds global ordering.</p>
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════ STEP 2 -->
+<section id="s2">
+<h2>Step 2 — Encoder: points look at each other</h2>
+<p>3 layers of self-attention. Click any point in the top row to see which other points it attends to.</p>
+<canvas id="c2" height="340"></canvas>
+<p class="hint">Click a point to change the attention source. Line thickness = attention weight.</p>
+<div class="grid">
+<div class="info ib"><b>Q·K<sup>T</sup> (similarity)</b><br>Every pair of points gets a score: "how relevant is point j to point i?" Softmax turns scores into weights summing to 1.</div>
+<div class="info ig"><b>Weighted sum of V</b><br>Each point's new vector = weighted average of all points' values. After 3 layers, each point "knows about" every other point.</div>
+</div>
+<div class="formula">
+<span class="hl-b">Q</span> = H·W<sub>Q</sub>, <span class="hl-g">K</span> = H·W<sub>K</sub>, <span class="hl-a">V</span> = H·W<sub>V</sub><br>
+Attn = softmax(<span class="hl-b">Q</span><span class="hl-g">K</span><sup>T</sup> / √d<sub>k</sub>) · <span class="hl-a">V</span>
+&nbsp;&nbsp;<span style="color:var(--fg2)">// d<sub>k</sub> = 64/4 = 16 per head, 4 heads total</span>
+</div>
+<div class="card">
+<h3>What the encoder learns</h3>
+<p>Linear probes on the encoder output recover: chord fraction (R²=0.98), turning angle (R²=0.82), curvature (R²=0.76). The model computes these through attention — no formulas for them exist in the code.</p>
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════ STEP 3 -->
+<section id="s3">
+<h2>Step 3 — Decoder: queries extract knots</h2>
+<p>Learned query vectors cross-attend to the encoded points. Each query becomes one knot. Click a query to see its attention pattern.</p>
+<canvas id="c3" height="380"></canvas>
+<p class="hint">Click a query (amber) to see which encoded points (green) it attends to.</p>
+<div class="grid">
+<div class="info ia"><b>Self-attention among queries</b><br>Queries coordinate: "You cover the first third, I'll handle the middle." Prevents knots from bunching up.</div>
+<div class="info ip"><b>Cross-attention to encoder</b><br>Each query looks at encoded points: "What geometry do I need?" Query for the middle attends to the sharpest-turn region.</div>
+</div>
+<div class="card">
+<h3>Why DETR-style queries?</h3>
+<p>The model needs to output K = N−2 knots, which varies with N. The 7 learned queries (K<sub>max</sub>+1) give a fixed maximum; a mask selects which ones are active for each sample. For N=6: 5 active (4 knots + 1 slack).</p>
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════ STEP 4 -->
+<section id="s4">
+<h2>Step 4 — Knot head: scores → ordered knots</h2>
+<p>Drag the raw scores to see how softplus → cumsum → normalize produces valid ordered knots.</p>
+<div class="card">
+<div style="display:flex;gap:20px;flex-wrap:wrap;margin:0 0 10px">
+<label class="mono" style="display:flex;align-items:center;gap:6px"><span class="hl-r">r₀</span><input type="range" min="-30" max="30" value="5" id="r0" oninput="uK()" style="width:120px"><span id="r0v">0.5</span></label>
+<label class="mono" style="display:flex;align-items:center;gap:6px"><span class="hl-r">r₁</span><input type="range" min="-30" max="30" value="-2" id="r1" oninput="uK()" style="width:120px"><span id="r1v">-0.2</span></label>
+<label class="mono" style="display:flex;align-items:center;gap:6px"><span class="hl-r">r₂</span><input type="range" min="-30" max="30" value="15" id="r2" oninput="uK()" style="width:120px"><span id="r2v">1.5</span></label>
+<label class="mono" style="display:flex;align-items:center;gap:6px"><span class="hl-r">r₃</span><input type="range" min="-30" max="30" value="-5" id="r3" oninput="uK()" style="width:120px"><span id="r3v">-0.5</span></label>
+<label class="mono" style="display:flex;align-items:center;gap:6px;color:var(--fg2)">slack<input type="range" min="-30" max="30" value="8" id="r4" oninput="uK()" style="width:120px"><span id="r4v">0.8</span></label>
+</div>
+<div id="kO" class="mono" style="line-height:2.0"></div>
+<canvas id="c4" height="60"></canvas>
+</div>
+<div class="formula">
+<b>A:</b> <span class="hl-a">s<sub>i</sub></span> = softplus(<span class="hl-r">r<sub>i</sub></span>) + ε &nbsp;<span style="color:var(--fg2)">// strictly positive increments</span><br>
+<b>B:</b> <span class="hl-g">c<sub>i</sub></span> = Σ<sub>j≤i</sub> <span class="hl-a">s<sub>j</sub></span> &nbsp;<span style="color:var(--fg2)">// cumsum → automatically increasing</span><br>
+<b>C:</b> <span class="hl">u<sub>i</sub></span> = <span class="hl-g">c<sub>i</sub></span> / <span class="hl-g">c<sub>K+1</sub></span> &nbsp;<span style="color:var(--fg2)">// normalize → all in (0, 1)</span>
+</div>
+<div class="info ip" style="margin:10px 0">
+<b>Always valid by construction:</b> softplus > 0 → cumsum is increasing → division maps to (0,1). No sorting needed. The ordering is guaranteed mathematically, not enforced by a constraint.
+</div>
+</section>
+
+<!-- ════════════════════════════════════════════════════ STEP 5 -->
+<section id="s5">
+<h2>Step 5 — The full chain</h2>
+<p>Everything connects. Forward pass computes the curve; backward pass teaches the attention layers.</p>
+<canvas id="c5" height="200"></canvas>
+<div class="formula">
+<b>Forward:</b> points → encoder (self-attn ×3) → decoder (cross-attn ×3) → knot head → knots → solve A(u)P=D̃ → curve → energy E<br><br>
+<b>Backward:</b> ∂E/∂θ = <span class="hl-r">∂E/∂u</span> · <span class="hl">∂u/∂θ</span><br>
+&nbsp;&nbsp;<span class="hl">∂u/∂θ</span> = standard backprop through transformer<br>
+&nbsp;&nbsp;<span class="hl-r">∂E/∂u</span> needs: <span class="hl-g">∂P/∂u<sub>k</sub> = −A<sup>−1</sup>(∂A/∂u<sub>k</sub>)P</span> &nbsp;<span style="color:var(--fg2)">// implicit differentiation through the solve</span>
+</div>
+<div class="grid">
+<div class="info ig"><b>Implicit differentiation</b><br>When knot u<sub>k</sub> changes, A changes, so P must adjust to keep AP = D̃. The formula gives exactly how much P moves per unit change in u<sub>k</sub>.</div>
+<div class="info ir"><b>Self-supervised</b><br>The loss is just E — the curvature of the curve. No labels. The curve grades itself. Every step is differentiable, so gradients flow all the way back.</div>
+</div>
+<div class="card">
+<h3>What each component learns</h3>
+<table style="width:100%;font-size:13px;border-collapse:collapse">
+<tr style="border-bottom:1px solid var(--bd)"><td style="padding:6px"><b>Encoder</b></td><td style="padding:6px">Geometric features: chord fractions, turning angles, curvature context</td></tr>
+<tr style="border-bottom:0.5px solid var(--bd)"><td style="padding:6px"><b>Decoder queries</b></td><td style="padding:6px">"I am knot position k" — each query specializes to a curve region</td></tr>
+<tr style="border-bottom:0.5px solid var(--bd)"><td style="padding:6px"><b>Knot head</b></td><td style="padding:6px">Translate geometric context into optimal spacing</td></tr>
+<tr><td style="padding:6px"><b>Full model</b></td><td style="padding:6px">Length-invariant geometric reasoning (trained N∈{4,5}, generalizes to N=6,7,8)</td></tr>
+</table>
+</div>
+</section>
+
+<script>
+var dk=matchMedia('(prefers-color-scheme:dark)').matches;
+var fg=dk?'#e8e6df':'#1a1a1a',fg2=dk?'#9c9a92':'#73726c',bd=dk?'#555':'#d3d1c7',
+bg=dk?'#1a1a1a':'#fafaf8',bg2=dk?'#2c2c2a':'#f0efeb';
+var pts=[{l:'D₀',c:'(0, 0)',f:['0.00','0.00','—','1.35','—','0.00']},
+{l:'D₁',c:'(1, 0.9)',f:['1.00','0.90','1.35','1.65','0.00','0.20']},
+{l:'D₂',c:'(0.89, 0.15)',f:['0.89','0.15','0.50','0.62','2.14','0.40']},
+{l:'D₃',c:'(1.1, -0.44)',f:['1.10','-0.44','0.62','0.68','1.87','0.60']},
+{l:'D₄',c:'(0.73, -0.21)',f:['0.73','-0.21','0.68','0.80','1.23','0.80']},
+{l:'D₅',c:'(1.5, 0)',f:['1.50','0.00','0.80','—','1.20','1.00']}];
+var fLabels=['x','y','d_prev','d_next','θ','k/N'];
+var cols=['#E24B4A','#EF9F27','#1D9E75','#2E86DE','#7F77DD','#A855F7'];
+
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
+function sc(cv){var r=cv.getBoundingClientRect();var dpr=window.devicePixelRatio||1;cv.width=r.width*dpr;cv.height=parseInt(cv.getAttribute('height'))*dpr;var ctx=cv.getContext('2d');ctx.scale(dpr,dpr);ctx.cw=r.width;ctx.ch=parseInt(cv.getAttribute('height'));return ctx}
+
+// ═══ STEP 1: INPUT ═══
+function draw1(){
+var cv=document.getElementById('c1'),ctx=sc(cv);
+var W=ctx.cw,H=ctx.ch,ml=20,gx=(W-2*ml)/6;
+// Title
+ctx.font='500 13px '+getComputedStyle(document.body).fontFamily;ctx.fillStyle=fg;ctx.textAlign='center';
+ctx.fillText('Raw data points',W/2,22);
+// Point boxes
+for(var i=0;i<6;i++){var cx=ml+gx*i+gx/2,y=36,bw=Math.min(gx-8,100);
+ctx.fillStyle=cols[i]+'18';rr(ctx,cx-bw/2,y,bw,44,6);ctx.fill();
+ctx.strokeStyle=cols[i];ctx.lineWidth=0.5;rr(ctx,cx-bw/2,y,bw,44,6);ctx.stroke();
+ctx.fillStyle=fg;ctx.font='500 13px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText(pts[i].l,cx,y+18);
+ctx.fillStyle=fg2;ctx.font='11px '+getComputedStyle(document.body).fontFamily;
+ctx.fillText(pts[i].c,cx,y+36)}
+// Arrow
+ctx.fillStyle=fg2;ctx.font='16px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('↓  extract 6 features per point',W/2,102);
+// Feature table
+var ty=118;
+ctx.fillStyle=fg2;ctx.font='500 12px '+getComputedStyle(document.body).fontFamily;
+for(var fi=0;fi<6;fi++){var fy=ty+fi*28;
+ctx.textAlign='right';ctx.fillStyle=fg2;ctx.fillText(fLabels[fi],ml+50,fy+16);
+for(var pi=0;pi<6;pi++){var cx2=ml+gx*pi+gx/2,bw2=Math.min(gx-8,100);
+ctx.fillStyle=bg2;rr(ctx,cx2-bw2/2,fy,bw2,22,4);ctx.fill();
+ctx.strokeStyle=bd;ctx.lineWidth=0.5;rr(ctx,cx2-bw2/2,fy,bw2,22,4);ctx.stroke();
+ctx.fillStyle=fg;ctx.font='11px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText(pts[pi].f[fi],cx2,fy+15)}}
+// Arrow
+var ay=ty+6*28+8;
+ctx.fillStyle=fg2;ctx.font='16px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('↓  Linear(6→64) + positional embedding',W/2,ay+14);
+// 64-d tokens
+var ty2=ay+28;
+for(var i=0;i<6;i++){var cx3=ml+gx*i+gx/2,bw3=Math.min(gx-8,100);
+var grd=ctx.createLinearGradient(cx3-bw3/2,0,cx3+bw3/2,0);
+grd.addColorStop(0,cols[i]+'30');grd.addColorStop(1,cols[i]+'08');
+ctx.fillStyle=grd;rr(ctx,cx3-bw3/2,ty2,bw3,36,6);ctx.fill();
+ctx.strokeStyle=cols[i]+'80';ctx.lineWidth=0.5;rr(ctx,cx3-bw3/2,ty2,bw3,36,6);ctx.stroke();
+ctx.fillStyle=fg;ctx.font='500 12px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('h'+i,cx3,ty2+16);
+ctx.fillStyle=fg2;ctx.font='10px '+getComputedStyle(document.body).fontFamily;
+ctx.fillText('64-d vector',cx3,ty2+30)}
+// Label
+ctx.fillStyle=fg2;ctx.font='12px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('Ready for the encoder →',W/2,ty2+52)
+}
+draw1();
+
+// ═══ STEP 2: ENCODER SELF-ATTENTION ═══
+var selE=1;
+var encW=[[.30,.28,.18,.10,.08,.06],[.08,.32,.25,.15,.12,.08],[.05,.20,.30,.22,.15,.08],
+[.04,.10,.18,.32,.22,.14],[.06,.08,.12,.20,.30,.24],[.05,.06,.08,.14,.22,.45]];
+function draw2(){
+var cv=document.getElementById('c2'),ctx=sc(cv);
+var W=ctx.cw,H=ctx.ch,ml=30,gx=(W-2*ml)/6;
+// Before row
+ctx.font='500 12px '+getComputedStyle(document.body).fontFamily;ctx.fillStyle=fg2;ctx.textAlign='center';
+ctx.fillText('Input tokens (before attention)',W/2,18);
+var y1=30;
+for(var i=0;i<6;i++){var cx=ml+gx*i+gx/2,bw=Math.min(gx-8,90);
+ctx.fillStyle=i===selE?'#1D9E75':(dk?'#3d3d3a':bg2);
+rr(ctx,cx-bw/2,y1,bw,38,6);ctx.fill();
+ctx.strokeStyle=i===selE?'#1D9E75':'#888';ctx.lineWidth=i===selE?2:.5;
+rr(ctx,cx-bw/2,y1,bw,38,6);ctx.stroke();
+ctx.fillStyle=i===selE?'#fff':fg;ctx.font='500 13px '+getComputedStyle(document.body).fontFamily;
+ctx.textAlign='center';ctx.fillText('h'+i,cx,y1+23)}
+// Attention curves
+var w=encW[selE];
+for(var j=0;j<6;j++){var lw=w[j]*10;if(lw<.3)continue;
+var sx=ml+gx*selE+gx/2,ex=ml+gx*j+gx/2;
+ctx.strokeStyle='rgba(239,159,39,'+(0.25+w[j]*0.75)+')';ctx.lineWidth=lw;
+ctx.beginPath();ctx.moveTo(sx,y1+38);
+var cy1=y1+38+50,cy2=190;
+ctx.bezierCurveTo(sx,cy1,ex,cy2,ex,210);ctx.stroke();
+// Weight label
+ctx.fillStyle=fg2;ctx.font='10px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText(Math.round(w[j]*100)+'%',(sx+ex)/2+(j===selE?0:(j<selE?-14:14)),150)}
+// After row
+ctx.fillStyle=fg2;ctx.font='500 12px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('Updated tokens (after attention)',W/2,206);
+var y2=218;
+for(var i=0;i<6;i++){var cx2=ml+gx*i+gx/2,bw2=Math.min(gx-8,90);
+ctx.fillStyle=dk?'#2c2c2a':bg;
+rr(ctx,cx2-bw2/2,y2,bw2,38,6);ctx.fill();
+ctx.strokeStyle=i===selE?'#EF9F27':'#888';ctx.lineWidth=i===selE?2:.5;
+rr(ctx,cx2-bw2/2,y2,bw2,38,6);ctx.stroke();
+ctx.fillStyle=fg;ctx.font='500 13px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText("h'"+i,cx2,y2+23)}
+if(selE>=0){ctx.fillStyle=fg2;ctx.font='11px '+getComputedStyle(document.body).fontFamily;
+ctx.textAlign='center';
+ctx.fillText("h'"+selE+" = "+w.map(function(v,j){return Math.round(v*100)+'%·V'+j}).join(' + '),W/2,y2+56)}
+ctx.fillStyle=fg2;ctx.font='11px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('× 3 layers  →  each point knows about every other point',W/2,y2+76)}
+document.getElementById('c2').onclick=function(e){
+var cv=document.getElementById('c2'),r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
+var mx=(e.clientX-r.left),W=r.width,ml=30,gx=(W-2*ml)/6;
+for(var i=0;i<6;i++){if(Math.abs(mx-(ml+gx*i+gx/2))<gx/2){selE=i;draw2();return}}};
+draw2();
+
+// ═══ STEP 3: DECODER CROSS-ATTENTION ═══
+var selD=0;
+var qLabels=['query₀','query₁','query₂','query₃','slack'];
+var crossW=[[.40,.30,.15,.08,.05,.02],[.05,.18,.35,.25,.12,.05],
+[.03,.05,.12,.38,.30,.12],[.02,.04,.06,.12,.32,.44],[.12,.12,.14,.18,.20,.24]];
+var qInterp=['Attends to the start of the curve — placing u₁',
+'Attends to the early-mid region — placing u₂',
+'Attends to the mid-late region — placing u₃',
+'Attends to the end of the curve — placing u₄',
+'Slack query — absorbs remaining parameter range'];
+function draw3(){
+var cv=document.getElementById('c3'),ctx=sc(cv);
+var W=ctx.cw,H=ctx.ch;
+// Query row
+ctx.font='500 12px '+getComputedStyle(document.body).fontFamily;ctx.fillStyle=fg2;ctx.textAlign='center';
+ctx.fillText('Decoder queries (learned vectors)',W/2,16);
+var qml=30,qgx=(W-2*qml)/5,y1=28;
+for(var i=0;i<5;i++){var cx=qml+qgx*i+qgx/2,bw=Math.min(qgx-6,110);
+ctx.fillStyle=i===selD?'#EF9F27':(dk?'#444':'#FAEEDA');
+rr(ctx,cx-bw/2,y1,bw,38,6);ctx.fill();
+ctx.strokeStyle=i===selD?'#BA7517':'#ccc';ctx.lineWidth=i===selD?2:.5;
+rr(ctx,cx-bw/2,y1,bw,38,6);ctx.stroke();
+ctx.fillStyle=i===selD?'#fff':(dk?'#e8e6df':'#854F0B');
+ctx.font='500 11px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText(qLabels[i],cx,y1+23)}
+// Cross-attention lines
+var w=crossW[selD];
+var eml=30,egx=(W-2*eml)/6,y2=250;
+for(var j=0;j<6;j++){var lw=w[j]*10;if(lw<.3)continue;
+var sx=qml+qgx*selD+qgx/2,ex=eml+egx*j+egx/2;
+ctx.strokeStyle='rgba(127,119,221,'+(0.25+w[j]*0.75)+')';ctx.lineWidth=lw;
+ctx.beginPath();ctx.moveTo(sx,y1+38);
+ctx.bezierCurveTo(sx,y1+38+60,ex,y2-60,ex,y2);ctx.stroke();
+ctx.fillStyle=fg2;ctx.font='10px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText(Math.round(w[j]*100)+'%',(sx+ex)/2+(j<3?-12:12),165)}
+// Encoded points
+ctx.fillStyle=fg2;ctx.font='500 12px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('Encoded points (from encoder output)',W/2,y2-14);
+for(var i=0;i<6;i++){var cx2=eml+egx*i+egx/2,bw2=Math.min(egx-8,90);
+ctx.fillStyle=dk?'#085041':'#E1F5EE';
+rr(ctx,cx2-bw2/2,y2,bw2,38,6);ctx.fill();
+ctx.strokeStyle='#1D9E75';ctx.lineWidth=.5;
+rr(ctx,cx2-bw2/2,y2,bw2,38,6);ctx.stroke();
+ctx.fillStyle=dk?'#9FE1CB':'#085041';ctx.font='500 12px '+getComputedStyle(document.body).fontFamily;
+ctx.textAlign='center';ctx.fillText('enc'+i,cx2,y2+23)}
+// Interpretation
+ctx.fillStyle=fg2;ctx.font='12px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText(qInterp[selD],W/2,y2+58);
+ctx.fillText('× 3 decoder layers (self-attn among queries + cross-attn to encoder)',W/2,y2+78)}
+document.getElementById('c3').onclick=function(e){
+var cv=document.getElementById('c3'),r=cv.getBoundingClientRect();
+var mx=e.clientX-r.left,W=r.width,qml=30,qgx=(W-2*qml)/5;
+for(var i=0;i<5;i++){if(Math.abs(mx-(qml+qgx*i+qgx/2))<qgx/2){selD=i;draw3();return}}};
+draw3();
+
+// ═══ STEP 4: KNOT HEAD ═══
+function sp(x){return Math.log(1+Math.exp(x))}
+function uK(){
+var rv=[];for(var i=0;i<5;i++){rv[i]=+document.getElementById('r'+i).value/10;
+document.getElementById('r'+i+'v').textContent=rv[i].toFixed(1)}
+var sv=rv.map(function(r){return sp(r)+.001});
+var cv=[],sum=0;for(var i=0;i<5;i++){sum+=sv[i];cv.push(sum)}
+var knots=[];for(var i=0;i<4;i++)knots.push(cv[i]/cv[4]);
+var o=document.getElementById('kO');
+o.innerHTML='<span class="hl-r">raw r</span> = ['+rv.map(function(v){return v.toFixed(1)}).join(', ')+']<br>'+
+'<span class="hl-a">softplus s</span> = ['+sv.map(function(v){return v.toFixed(3)}).join(', ')+'] <span style="color:var(--fg2)">← all positive</span><br>'+
+'<span class="hl-g">cumsum c</span> = ['+cv.map(function(v){return v.toFixed(3)}).join(', ')+'] <span style="color:var(--fg2)">← increasing</span><br>'+
+'<span class="hl">knots u</span> = [<b>'+knots.map(function(v){return v.toFixed(4)}).join(', ')+'</b>] <span style="color:var(--fg2)">← in (0,1), ordered</span>';
+// Bar
+var cvs=document.getElementById('c4'),ctx=sc(cvs);
+var W=ctx.cw,H=ctx.ch,ml=20,bw=W-2*ml;
+ctx.fillStyle=bg2;rr(ctx,ml,8,bw,28,5);ctx.fill();
+ctx.strokeStyle=bd;ctx.lineWidth=.5;rr(ctx,ml,8,bw,28,5);ctx.stroke();
+for(var i=0;i<4;i++){var x=ml+knots[i]*bw;
+ctx.fillStyle='#7F77DD';ctx.beginPath();ctx.arc(x,22,7,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#fff';ctx.font='500 9px '+getComputedStyle(document.body).fontFamily;
+ctx.textAlign='center';ctx.fillText('u'+(i+1),x,25);
+ctx.fillStyle=fg;ctx.font='11px '+getComputedStyle(document.body).fontFamily;
+ctx.fillText(knots[i].toFixed(3),x,50)}
+ctx.fillStyle=fg2;ctx.font='10px '+getComputedStyle(document.body).fontFamily;
+ctx.textAlign='left';ctx.fillText('0',ml,50);ctx.textAlign='right';ctx.fillText('1',ml+bw,50)}
+uK();
+
+// ═══ STEP 5: FULL CHAIN ═══
+function draw5(){
+var cv=document.getElementById('c5'),ctx=sc(cv);
+var W=ctx.cw,H=ctx.ch;
+var stages=[
+{l:'Points',sub:'D∈ℝᴺˣ²',c:'#2E86DE',x:0},
+{l:'Encoder',sub:'self-attn ×3',c:'#7F77DD',x:1},
+{l:'Decoder',sub:'cross-attn ×3',c:'#7F77DD',x:2},
+{l:'Knot head',sub:'softplus·cumsum',c:'#EF9F27',x:3},
+{l:'Solve',sub:'A(u)P = D̃',c:'#1D9E75',x:4},
+{l:'Energy',sub:'E = ∫κ²‖C\'‖dt',c:'#E24B4A',x:5}];
+var n=stages.length,ml=20,bw=Math.min((W-2*ml-n*8)/n,105),gap=8;
+var totalW=n*bw+(n-1)*gap,startX=(W-totalW)/2,y=40;
+// Boxes
+for(var i=0;i<n;i++){var x=startX+i*(bw+gap);
+ctx.fillStyle=stages[i].c+'18';rr(ctx,x,y,bw,60,8);ctx.fill();
+ctx.strokeStyle=stages[i].c;ctx.lineWidth=.5;rr(ctx,x,y,bw,60,8);ctx.stroke();
+ctx.fillStyle=fg;ctx.font='500 12px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText(stages[i].l,x+bw/2,y+22);
+ctx.fillStyle=fg2;ctx.font='10px '+getComputedStyle(document.body).fontFamily;
+ctx.fillText(stages[i].sub,x+bw/2,y+42);
+if(i<n-1){ctx.fillStyle=fg2;ctx.font='14px '+getComputedStyle(document.body).fontFamily;
+ctx.fillText('→',x+bw+gap/2,y+30)}}
+// Query arrow
+var qx=startX+2*(bw+gap)+bw/2;
+ctx.fillStyle=fg2;ctx.font='10px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('learned queries',qx,y-8);ctx.fillText('↓',qx,y-1);
+// Gradient arrow
+var gy=y+75;
+ctx.strokeStyle='#E24B4A80';ctx.lineWidth=1.5;ctx.setLineDash([4,4]);
+ctx.beginPath();ctx.moveTo(startX+5*(bw+gap)+bw/2,gy);ctx.lineTo(startX+bw/2,gy);ctx.stroke();
+ctx.setLineDash([]);
+ctx.fillStyle='#E24B4A';ctx.beginPath();ctx.moveTo(startX+bw/2-2,gy);
+ctx.lineTo(startX+bw/2+8,gy-5);ctx.lineTo(startX+bw/2+8,gy+5);ctx.closePath();ctx.fill();
+ctx.fillStyle='#E24B4A';ctx.font='11px '+getComputedStyle(document.body).fontFamily;ctx.textAlign='center';
+ctx.fillText('∇θE — gradients flow backward through everything (including the matrix solve)',W/2,gy+18);
+// Self-supervised label
+ctx.fillStyle=fg2;ctx.font='11px '+getComputedStyle(document.body).fontFamily;
+ctx.fillText('No labels needed — the curve\'s own curvature is the loss',W/2,gy+38);
+// Param count
+ctx.fillStyle=fg2;ctx.font='10px '+getComputedStyle(document.body).fontFamily;
+ctx.textAlign='left';ctx.fillText('Total: 353,793 parameters  |  d_model = 64  |  4 attention heads  |  max N = 10',ml,gy+58)}
+draw5();
+
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){
+dk=matchMedia('(prefers-color-scheme:dark)').matches;
+fg=dk?'#e8e6df':'#1a1a1a';fg2=dk?'#9c9a92':'#73726c';bd=dk?'#555':'#d3d1c7';
+bg=dk?'#1a1a1a':'#fafaf8';bg2=dk?'#2c2c2a':'#f0efeb';
+draw1();draw2();draw3();uK();draw5()});
+window.addEventListener('resize',function(){draw1();draw2();draw3();uK();draw5()});
+</script>
+</body>
+</html>

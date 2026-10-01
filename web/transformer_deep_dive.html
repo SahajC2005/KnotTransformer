@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inside the KnotTransformer — Every Matrix, Every Multiply</title>
+<style>
+:root{--bg:#fafaf8;--bg2:#f0efeb;--bg3:#e8e6df;--fg:#1a1a1a;--fg2:#73726c;--fg3:#a09e97;
+--bd:#d3d1c7;--blue:#2E86DE;--purple:#7F77DD;--green:#1D9E75;--amber:#EF9F27;--red:#E24B4A;
+--r:10px;--f:'Segoe UI',system-ui,sans-serif;--m:'SF Mono','Fira Code',monospace}
+@media(prefers-color-scheme:dark){:root{--bg:#1a1a1a;--bg2:#2c2c2a;--bg3:#3d3d3a;
+--fg:#e8e6df;--fg2:#9c9a92;--fg3:#73726c;--bd:#555}}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--f);color:var(--fg);background:var(--bg);max-width:820px;margin:0 auto;padding:20px;line-height:1.65}
+h1{font-size:26px;font-weight:500;margin:0 0 4px}
+h2{font-size:20px;font-weight:500;color:var(--purple);margin:48px 0 10px;padding-top:16px;border-top:0.5px solid var(--bd)}
+h3{font-size:16px;font-weight:500;margin:20px 0 8px}
+h4{font-size:14px;font-weight:500;margin:14px 0 4px;color:var(--fg2)}
+p{font-size:14px;color:var(--fg2);margin:0 0 10px}
+b{font-weight:500}
+.sec{margin:0 0 32px}
+.card{background:var(--bg2);border-radius:var(--r);padding:16px 20px;margin:12px 0}
+.hl{color:var(--purple);font-weight:500}.hlb{color:var(--blue);font-weight:500}
+.hlg{color:var(--green);font-weight:500}.hla{color:var(--amber);font-weight:500}
+.hlr{color:var(--red);font-weight:500}
+.note{font-size:13px;color:var(--fg2);padding:10px 14px;border-radius:var(--r);margin:10px 0;line-height:1.6}
+.nb{background:#E6F1FB;border-left:3px solid var(--blue)}
+.ng{background:#E1F5EE;border-left:3px solid var(--green)}
+.na{background:#FAEEDA;border-left:3px solid var(--amber)}
+.np{background:#EEEDFE;border-left:3px solid var(--purple)}
+.nr{background:#FCEBEB;border-left:3px solid var(--red)}
+
+/* Matrix styles */
+.mx-wrap{overflow-x:auto;margin:10px 0}
+.mx{border-collapse:collapse;font-family:var(--m);font-size:12px;margin:0 auto}
+.mx td{padding:4px 8px;text-align:right;border:0.5px solid var(--bd);min-width:52px;transition:background .15s}
+.mx .rh{text-align:left;font-weight:500;font-family:var(--f);border:none;color:var(--fg2);padding-right:10px;min-width:40px;font-size:12px}
+.mx .ch{text-align:center;font-weight:500;font-family:var(--f);border:none;color:var(--fg3);padding-bottom:4px;font-size:11px}
+.mx td.hi{background:var(--amber)22;font-weight:500}
+.mx td.hi2{background:var(--purple)22;font-weight:500}
+.mx td.hi3{background:var(--green)22;font-weight:500}
+.mx-label{text-align:center;font-size:13px;font-weight:500;margin:6px 0 2px}
+.mx-sub{text-align:center;font-size:11px;color:var(--fg3);margin:0 0 6px}
+.op{text-align:center;font-size:20px;color:var(--fg2);margin:8px 0;line-height:1}
+.op-label{text-align:center;font-size:11px;color:var(--fg3)}
+
+/* Interactive bits */
+.click-row{cursor:pointer}
+.click-row:hover td:not(.rh){background:var(--bg3)}
+canvas{display:block;width:100%;border-radius:var(--r);border:0.5px solid var(--bd);margin:8px 0}
+.hint{font-size:12px;color:var(--fg3);text-align:center;margin:4px 0 8px}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--purple);color:#fff;font-size:12px;font-weight:500;margin-right:8px}
+nav{position:sticky;top:0;z-index:9;background:var(--bg);padding:8px 0;display:flex;gap:5px;flex-wrap:wrap;justify-content:center;border-bottom:0.5px solid var(--bd)}
+nav a{padding:5px 12px;border-radius:14px;font-size:12px;text-decoration:none;color:var(--fg2);border:0.5px solid var(--bd);transition:.15s;white-space:nowrap}
+nav a:hover{border-color:var(--purple);color:var(--purple)}
+.eq{font-family:var(--m);font-size:13px;background:var(--bg2);padding:12px 16px;border-radius:var(--r);margin:10px 0;line-height:1.9;overflow-x:auto}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+@media(max-width:550px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<h1>Inside the KnotTransformer</h1>
+<p>Every matrix, every multiply, every number — traced through one complete forward pass.</p>
+<p style="font-size:13px">We use a toy example: <b>4 points, dimension 4, 1 attention head</b>. The real model uses 6+ points, dimension 64, 4 heads — but every operation is identical, just bigger matrices.</p>
+
+<nav>
+<a href="#s1">1. Input</a>
+<a href="#s2">2. Q, K, V</a>
+<a href="#s3">3. Scores</a>
+<a href="#s4">4. Softmax</a>
+<a href="#s5">5. Output</a>
+<a href="#s6">6. Residual</a>
+<a href="#s7">7. FFN</a>
+<a href="#s8">8. Heads</a>
+<a href="#s9">9. Layers</a>
+<a href="#s10">10. Decoder</a>
+<a href="#s11">11. Knots</a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s1" class="sec">
+<h2><span class="step-num">1</span>The input matrix H</h2>
+<p>After feature extraction and projection, each point is a row of 4 numbers. The whole input is a 4×4 matrix.</p>
+
+<div class="mx-label">H — input tokens</div>
+<div class="mx-sub">Each row = one point. Each column = one learned feature dimension.</div>
+<div class="mx-wrap">
+<table class="mx" id="mH">
+<tr><td class="ch"></td><td class="ch">dim₁</td><td class="ch">dim₂</td><td class="ch">dim₃</td><td class="ch">dim₄</td><td class="ch" style="min-width:180px;text-align:left">meaning</td></tr>
+<tr><td class="rh" style="color:var(--red)">h₀</td><td>1.0</td><td>0.2</td><td>0.0</td><td>0.1</td><td style="font-size:11px;color:var(--fg2);text-align:left;border:none">D₀: start point, gentle region</td></tr>
+<tr><td class="rh" style="color:var(--amber)">h₁</td><td>0.5</td><td>0.8</td><td>1.2</td><td>0.3</td><td style="font-size:11px;color:var(--fg2);text-align:left;border:none">D₁: rising toward the bend</td></tr>
+<tr><td class="rh" style="color:var(--green)">h₂</td><td>0.3</td><td>0.1</td><td>0.9</td><td>1.5</td><td style="font-size:11px;color:var(--fg2);text-align:left;border:none">D₂: the sharp bend (high dim₄!)</td></tr>
+<tr><td class="rh" style="color:var(--blue)">h₃</td><td>0.8</td><td>0.4</td><td>0.1</td><td>0.2</td><td style="font-size:11px;color:var(--fg2);text-align:left;border:none">D₃: end point, gentle region</td></tr>
+</table>
+</div>
+
+<div class="note nb">
+<b>Right now each point only knows about itself.</b> Row h₂ (the sharp bend) has no information about what h₃ looks like or how far away it is. Self-attention will fix this.
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s2" class="sec">
+<h2><span class="step-num">2</span>Three projections: Q, K, V</h2>
+<p>Three separate learned weight matrices transform H into three different versions. Each serves a different purpose in attention.</p>
+
+<h3><span class="hlb">Q = H · W<sub>Q</sub></span> — the questions</h3>
+<p>"What kind of information does each point need?"</p>
+
+<div class="grid">
+<div>
+<div class="mx-label">H (4×4)</div>
+<div class="mx-wrap"><table class="mx">
+<tr><td class="rh">h₀</td><td>1.0</td><td>0.2</td><td>0.0</td><td>0.1</td></tr>
+<tr><td class="rh">h₁</td><td>0.5</td><td>0.8</td><td>1.2</td><td>0.3</td></tr>
+<tr><td class="rh">h₂</td><td>0.3</td><td>0.1</td><td>0.9</td><td>1.5</td></tr>
+<tr><td class="rh">h₃</td><td>0.8</td><td>0.4</td><td>0.1</td><td>0.2</td></tr>
+</table></div>
+</div>
+<div>
+<div class="mx-label">W<sub>Q</sub> (4×4, learned)</div>
+<div class="mx-wrap"><table class="mx">
+<tr><td>0.5</td><td>0.1</td><td>-0.3</td><td>0.2</td></tr>
+<tr><td>0.3</td><td>0.8</td><td>0.1</td><td>-0.1</td></tr>
+<tr><td>-0.2</td><td>0.4</td><td>0.7</td><td>0.1</td></tr>
+<tr><td>0.1</td><td>-0.1</td><td>0.5</td><td>0.9</td></tr>
+</table></div>
+</div>
+</div>
+
+<div class="op">×</div>
+
+<div class="mx-label" style="color:var(--blue)">Q = H · W<sub>Q</sub></div>
+<div class="mx-sub">Each row is one point's "question" — what it's looking for</div>
+<div class="mx-wrap">
+<table class="mx" id="mQ">
+<tr><td class="ch"></td><td class="ch">dim₁</td><td class="ch">dim₂</td><td class="ch">dim₃</td><td class="ch">dim₄</td></tr>
+<tr><td class="rh">Q₀</td><td>0.57</td><td>0.25</td><td>-0.21</td><td>0.27</td></tr>
+<tr><td class="rh">Q₁</td><td>0.24</td><td>0.86</td><td>0.77</td><td>0.15</td></tr>
+<tr><td class="rh">Q₂</td><td>0.03</td><td>0.36</td><td class="hi2">1.07</td><td class="hi2">1.40</td></tr>
+<tr><td class="rh">Q₃</td><td>0.54</td><td>0.38</td><td>-0.11</td><td>0.30</td></tr>
+</table>
+</div>
+<div class="note np">
+Notice <b>Q₂</b> (the sharp bend) has large values in dims 3-4, while Q₀ and Q₃ (gentle points) have smaller, different patterns. W<sub>Q</sub> learned to transform bend-like inputs into a distinctive question signature.
+</div>
+
+<h3><span class="hlg">K = H · W<sub>K</sub></span> — the signs each point holds up</h3>
+<p>"What does each point advertise about itself?"</p>
+
+<div class="mx-label">W<sub>K</sub> (4×4, <b>different</b> from W<sub>Q</sub>)</div>
+<div class="mx-wrap"><table class="mx">
+<tr><td>0.4</td><td>-0.2</td><td>0.3</td><td>0.1</td></tr>
+<tr><td>0.1</td><td>0.6</td><td>0.2</td><td>0.3</td></tr>
+<tr><td>0.2</td><td>0.3</td><td>0.5</td><td>-0.1</td></tr>
+<tr><td>-0.1</td><td>0.1</td><td>0.4</td><td>0.8</td></tr>
+</table></div>
+<div class="op">H × W<sub>K</sub> =</div>
+<div class="mx-label" style="color:var(--green)">K = H · W<sub>K</sub></div>
+<div class="mx-sub">Each row is one point's "advertisement" — what it shows to others</div>
+<div class="mx-wrap">
+<table class="mx">
+<tr><td class="ch"></td><td class="ch">dim₁</td><td class="ch">dim₂</td><td class="ch">dim₃</td><td class="ch">dim₄</td></tr>
+<tr><td class="rh">K₀</td><td>0.41</td><td>-0.07</td><td>0.38</td><td>0.15</td></tr>
+<tr><td class="rh">K₁</td><td>0.49</td><td>0.84</td><td>0.93</td><td>0.16</td></tr>
+<tr><td class="rh">K₂</td><td>0.28</td><td>0.33</td><td class="hi3">0.81</td><td class="hi3">1.14</td></tr>
+<tr><td class="rh">K₃</td><td>0.34</td><td>0.06</td><td>0.37</td><td>0.24</td></tr>
+</table>
+</div>
+
+<div class="note ng">
+<b>Q₂ and K₂ are different</b> even though they come from the same point. Q₂ encodes "what I'm looking for" while K₂ encodes "what I am." The separate W<sub>Q</sub> and W<sub>K</sub> matrices make this possible.
+</div>
+
+<h3><span class="hla">V = H · W<sub>V</sub></span> — the content to pass along</h3>
+<p>"If someone attends to me, what information do I send them?"</p>
+
+<div class="mx-label" style="color:var(--amber)">V = H · W<sub>V</sub></div>
+<div class="mx-sub">Each row is the actual content a point carries</div>
+<div class="mx-wrap">
+<table class="mx">
+<tr><td class="ch"></td><td class="ch">dim₁</td><td class="ch">dim₂</td><td class="ch">dim₃</td><td class="ch">dim₄</td></tr>
+<tr><td class="rh">V₀</td><td>0.61</td><td>0.33</td><td>0.14</td><td>-0.16</td></tr>
+<tr><td class="rh">V₁</td><td>0.55</td><td>0.65</td><td>1.01</td><td>0.43</td></tr>
+<tr><td class="rh">V₂</td><td>0.56</td><td>0.56</td><td>0.73</td><td>1.25</td></tr>
+<tr><td class="rh">V₃</td><td>0.50</td><td>0.42</td><td>0.24</td><td>0.00</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h4>Why three separate matrices?</h4>
+<p><b>Without projections</b> (raw dot product h<sub>i</sub>·h<sub>j</sub>): can only find "points that look like me." Two points with different features get a low score even if they're highly relevant to each other.</p>
+<p><b>With projections</b>: the model learns what to ask for (Q), what to advertise (K), and what to send (V) independently. The sharp bend D₂ can ask "who else is bending?" (Q) while advertising "I'm the sharpest point" (K) and sending "here's my curvature data" (V) — three different things.</p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s3" class="sec">
+<h2><span class="step-num">3</span>Attention scores: Q · K<sup>T</sup></h2>
+<p>Every point's question gets compared against every point's sign. This is a single matrix multiply that produces an N×N similarity matrix.</p>
+
+<div class="eq">
+scores[i][j] = Q<sub>i</sub> · K<sub>j</sub> = Σ<sub>d</sub> Q<sub>i,d</sub> × K<sub>j,d</sub>
+<br><br>
+Example: scores[2][1] = Q₂ · K₁<br>
+= (<span class="hl">0.03</span>)(0.49) + (<span class="hl">0.36</span>)(0.84) + (<span class="hl">1.07</span>)(0.93) + (<span class="hl">1.40</span>)(0.16)<br>
+= 0.015 + 0.302 + 0.995 + 0.224 = <b>1.536</b><br>
+<span style="color:var(--fg2)">"D₂'s question matches D₁'s advertisement with score 1.536"</span>
+</div>
+
+<p><b>Click any cell</b> in the score matrix to see how that dot product was computed:</p>
+
+<div class="mx-label">scores = Q · K<sup>T</sup> / √4</div>
+<div class="mx-sub">Click a cell to see the computation. Row = who's asking. Column = who's being looked at.</div>
+<div class="mx-wrap">
+<table class="mx" id="mS">
+<tr><td class="ch"></td><td class="ch" style="color:var(--red)">→ K₀</td><td class="ch" style="color:var(--amber)">→ K₁</td><td class="ch" style="color:var(--green)">→ K₂</td><td class="ch" style="color:var(--blue)">→ K₃</td></tr>
+<tr class="click-row" onclick="showDot(0)"><td class="rh" style="color:var(--red)">Q₀ →</td><td id="s00">0.11</td><td id="s01">0.22</td><td id="s02">0.13</td><td id="s03">0.11</td></tr>
+<tr class="click-row" onclick="showDot(1)"><td class="rh" style="color:var(--amber)">Q₁ →</td><td id="s10">0.18</td><td id="s11">0.69</td><td id="s12">0.50</td><td id="s13">0.18</td></tr>
+<tr class="click-row" onclick="showDot(2)"><td class="rh" style="color:var(--green)">Q₂ →</td><td id="s20">0.17</td><td id="s21" class="hi">0.77</td><td id="s22" class="hi">0.86</td><td id="s23">0.24</td></tr>
+<tr class="click-row" onclick="showDot(3)"><td class="rh" style="color:var(--blue)">Q₃ →</td><td id="s30">0.17</td><td id="s31">0.33</td><td id="s32">0.22</td><td id="s33">0.15</td></tr>
+</table>
+</div>
+<div id="dotDetail" class="eq" style="min-height:40px;font-size:12px"></div>
+
+<div class="note na">
+<b>Read row 2 (D₂'s perspective):</b> D₂ scores itself highest (0.86) and D₁ second-highest (0.77). The sharp bend pays most attention to itself and its neighbor entering the bend. D₀ and D₃ (gentle regions) get low scores — they're less relevant.
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s4" class="sec">
+<h2><span class="step-num">4</span>Softmax → attention weights</h2>
+<p>Each row of scores independently gets turned into probabilities summing to 1. This is what determines "how much attention does each point pay to each other point."</p>
+
+<div class="eq">
+weight[i][j] = exp(score[i][j]) / Σ<sub>k</sub> exp(score[i][k])<br><br>
+Row 2: exp([0.17, 0.77, 0.86, 0.24]) = [1.185, 2.160, 2.363, 1.271]<br>
+sum = 6.979<br>
+weights = [1.185/6.979, 2.160/6.979, 2.363/6.979, 1.271/6.979]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= [<b>0.170, 0.309, 0.339, 0.182</b>] &nbsp;← sums to 1.00
+</div>
+
+<p><b>Click any row</b> to see its softmax breakdown:</p>
+<div class="mx-label">weights = softmax(scores)</div>
+<div class="mx-sub">Each row sums to 1.00. Larger weight = more attention paid to that point.</div>
+<div class="mx-wrap">
+<table class="mx" id="mW">
+<tr><td class="ch"></td><td class="ch">→ D₀</td><td class="ch">→ D₁</td><td class="ch">→ D₂</td><td class="ch">→ D₃</td><td class="ch">sum</td></tr>
+<tr class="click-row" onclick="showSm(0)"><td class="rh">D₀</td><td>0.246</td><td>0.278</td><td>0.252</td><td>0.224</td><td style="color:var(--fg3)">1.00</td></tr>
+<tr class="click-row" onclick="showSm(1)"><td class="rh">D₁</td><td>0.162</td><td class="hi">0.346</td><td class="hi">0.275</td><td>0.217</td><td style="color:var(--fg3)">1.00</td></tr>
+<tr class="click-row" onclick="showSm(2)"><td class="rh">D₂</td><td>0.170</td><td class="hi">0.309</td><td class="hi">0.339</td><td>0.182</td><td style="color:var(--fg3)">1.00</td></tr>
+<tr class="click-row" onclick="showSm(3)"><td class="rh">D₃</td><td>0.222</td><td>0.272</td><td>0.246</td><td>0.260</td><td style="color:var(--fg3)">1.00</td></tr>
+</table>
+</div>
+<div id="smDetail" class="eq" style="min-height:40px;font-size:12px"></div>
+
+<p>Visualized — click a point to see what it attends to:</p>
+<canvas id="cAttn" height="200"></canvas>
+<div class="hint">Click a point in the top row to change which attention pattern is shown</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s5" class="sec">
+<h2><span class="step-num">5</span>Weighted sum of values</h2>
+<p>Each point grabs a weighted mix of everyone's value vectors. This is where information actually flows between tokens.</p>
+
+<div class="eq">
+output[i] = Σ<sub>j</sub> weight[i][j] × V[j]<br><br>
+<b>For D₂:</b><br>
+output[2] = <span class="hla">0.170</span>×V₀ + <span class="hla">0.309</span>×V₁ + <span class="hla">0.339</span>×V₂ + <span class="hla">0.182</span>×V₃<br><br>
+dim₁: 0.170(0.61) + 0.309(0.55) + 0.339(0.56) + 0.182(0.50) = <b>0.554</b><br>
+dim₂: 0.170(0.33) + 0.309(0.65) + 0.339(0.56) + 0.182(0.42) = <b>0.524</b><br>
+dim₃: 0.170(0.14) + 0.309(1.01) + 0.339(0.73) + 0.182(0.24) = <b>0.630</b><br>
+dim₄: 0.170(-0.16)+ 0.309(0.43) + 0.339(1.25) + 0.182(0.00) = <b>0.532</b>
+</div>
+
+<div class="mx-label">output = weights · V</div>
+<div class="mx-sub">Each row is a blend of all points' values, weighted by attention</div>
+<div class="mx-wrap">
+<table class="mx">
+<tr><td class="ch"></td><td class="ch">dim₁</td><td class="ch">dim₂</td><td class="ch">dim₃</td><td class="ch">dim₄</td></tr>
+<tr><td class="rh">out₀</td><td>0.557</td><td>0.497</td><td>0.540</td><td>0.372</td></tr>
+<tr><td class="rh">out₁</td><td>0.559</td><td>0.523</td><td>0.615</td><td>0.507</td></tr>
+<tr><td class="rh" style="color:var(--green)">out₂</td><td>0.554</td><td>0.524</td><td class="hi3">0.630</td><td class="hi3">0.532</td></tr>
+<tr><td class="rh">out₃</td><td>0.558</td><td>0.498</td><td>0.536</td><td>0.374</td></tr>
+</table>
+</div>
+
+<h4>D₂ before vs after attention:</h4>
+<div class="mx-wrap">
+<table class="mx">
+<tr><td class="ch"></td><td class="ch">dim₁</td><td class="ch">dim₂</td><td class="ch">dim₃</td><td class="ch">dim₄</td><td class="ch" style="text-align:left;min-width:200px"></td></tr>
+<tr><td class="rh">before</td><td>0.30</td><td>0.10</td><td>0.90</td><td>1.50</td><td style="font-size:11px;color:var(--fg2);text-align:left;border:none">only knew about itself</td></tr>
+<tr><td class="rh" style="color:var(--green)">after</td><td>0.554</td><td>0.524</td><td>0.630</td><td>0.532</td><td style="font-size:11px;color:var(--fg2);text-align:left;border:none">blended with all neighbors</td></tr>
+</table>
+</div>
+<div class="note ng">
+D₂'s representation changed. It's no longer just "I'm a sharp bend" — it now encodes "I'm a sharp bend, D₁ is rising toward me, D₃ is gentle after me." The blending encoded the context.
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s6" class="sec">
+<h2><span class="step-num">6</span>Residual connection + LayerNorm</h2>
+<p>The original input is added back, then the vector is normalized.</p>
+<div class="eq">
+h₂_new = LayerNorm(h₂ + attention_output₂)<br><br>
+h₂ + out₂ = [0.30+0.554, 0.10+0.524, 0.90+0.630, 1.50+0.532]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= [0.854, 0.624, 1.530, 2.032]<br><br>
+mean = 1.260, &nbsp;std = 0.555<br><br>
+LayerNorm = [(0.854−1.260)/0.555, (0.624−1.260)/0.555, (1.530−1.260)/0.555, (2.032−1.260)/0.555]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= [<b>−0.73, −1.15, 0.49, 1.39</b>]
+</div>
+<div class="grid">
+<div class="note nb"><b>Why add the original back?</b> If attention learned nothing useful, the residual passes h₂ through unchanged. The model can never "forget" its own identity — it only adds context on top.</div>
+<div class="note np"><b>Why normalize?</b> After adding, the numbers might grow large. LayerNorm rescales each vector to mean=0, std=1 across its dimensions, keeping values in a stable range for the next layer.</div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s7" class="sec">
+<h2><span class="step-num">7</span>Feed-forward network (per token)</h2>
+<p>Each token independently passes through a 2-layer neural network. Attention mixed information across tokens; the FFN processes each token's mixed information.</p>
+<div class="eq">
+FFN(x) = GELU( x · W₁ + b₁ ) · W₂ + b₂<br><br>
+<b>Expand:</b> &nbsp;4-d → W₁ (4×16 in real model: 64→256) → 16-d<br>
+<b>Activate:</b> GELU (smooth ReLU: keeps positives, squashes negatives)<br>
+<b>Compress:</b> 16-d → W₂ (16×4 in real model: 256→64) → 4-d<br><br>
+Then: h₂_final = LayerNorm(h₂_after_attn + FFN(h₂_after_attn))
+</div>
+<div class="note na">
+<b>Why expand then compress?</b> The expansion to 4× width gives the network a bigger "thinking space" for nonlinear computation. GELU is the nonlinearity — without it, two linear layers collapse into one. Think of it as: drafting on a whiteboard (256-d) then summarizing onto a notecard (64-d).
+</div>
+<div class="card">
+<h4>That's one encoder layer. It consists of:</h4>
+<div class="eq" style="line-height:2.2">
+Input H (N×64)<br>
+&nbsp;&nbsp;↓ <span class="hlb">Q</span>=HW<sub>Q</sub>, <span class="hlg">K</span>=HW<sub>K</sub>, <span class="hla">V</span>=HW<sub>V</sub> &nbsp;— three projections<br>
+&nbsp;&nbsp;↓ scores = <span class="hlb">Q</span>·<span class="hlg">K</span><sup>T</sup>/√d<sub>k</sub> &nbsp;— every point vs every point<br>
+&nbsp;&nbsp;↓ weights = softmax(scores) &nbsp;— normalize to probabilities<br>
+&nbsp;&nbsp;↓ output = weights · <span class="hla">V</span> &nbsp;— grab weighted content<br>
+&nbsp;&nbsp;↓ <span class="hlr">+ residual + LayerNorm</span><br>
+&nbsp;&nbsp;↓ FFN (expand → GELU → compress)<br>
+&nbsp;&nbsp;↓ <span class="hlr">+ residual + LayerNorm</span><br>
+Output H' (N×64) — same shape, new content
+</div>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s8" class="sec">
+<h2><span class="step-num">8</span>Multiple attention heads</h2>
+<p>The real model uses 4 heads, each operating on 16 of the 64 dimensions. Each head can learn a different attention pattern.</p>
+<div class="eq">
+Split: Q (N×64) → Q₁(N×16), Q₂(N×16), Q₃(N×16), Q₄(N×16)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;K (N×64) → K₁(N×16), K₂(N×16), K₃(N×16), K₄(N×16)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;V (N×64) → V₁(N×16), V₂(N×16), V₃(N×16), V₄(N×16)<br><br>
+
+Each head independently: head<sub>h</sub> = softmax(Q<sub>h</sub>·K<sub>h</sub><sup>T</sup>/√16) · V<sub>h</sub> → N×16<br><br>
+
+Concatenate: [head₁ | head₂ | head₃ | head₄] → N×64<br>
+Final: concat · W<sub>O</sub> → N×64
+</div>
+<canvas id="cHeads" height="260"></canvas>
+<div class="hint">Each head learns its own N×N attention pattern using different dimensions</div>
+<div class="note np">
+<b>Why 4 separate patterns?</b> Each head "sees" different features (dims 1-16, 17-32, etc.):<br>
+• Head 1 might learn: "attend to spatially nearby points"<br>
+• Head 2 might learn: "attend to points with similar curvature"<br>
+• Head 3 might learn: "attend to the endpoints for global context"<br>
+• Head 4 might learn: "attend to points on the opposite side of the curve"<br><br>
+The 4 patterns get concatenated, enriching each token from 4 perspectives simultaneously.
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s9" class="sec">
+<h2><span class="step-num">9</span>Stacking 3 encoder layers</h2>
+<p>Each layer has <b>its own</b> W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>, W<sub>O</sub>, W₁, W₂. Different layers learn different patterns.</p>
+<canvas id="cLayers" height="320"></canvas>
+<div class="card">
+<h4>What each layer learns (intuitively)</h4>
+<p><b>Layer 1:</b> Direct relationships. "D₂ notices D₁ and D₃ are its neighbors."</p>
+<p><b>Layer 2:</b> Indirect relationships. "D₂ already absorbed D₁'s info. Now D₂ attends to D₁ again, but D₁ already knows about D₀. So D₂ learns about D₀ through D₁."</p>
+<p><b>Layer 3:</b> Global context. "Every point now has full-sequence awareness. D₂ knows the total arc length, the overall shape, where the bends are."</p>
+<p style="margin:8px 0 0"><b>After 3 layers:</b> the encoder output is N vectors of 64 dimensions each. Same shape as input, but each vector encodes global geometric context. This is the <b>encoder memory</b>.</p>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s10" class="sec">
+<h2><span class="step-num">10</span>The decoder: queries extract knots</h2>
+<p>The decoder has a <b>different set</b> of vectors — learned queries — that read from the encoder memory. Each query becomes one knot.</p>
+
+<h3>Two types of attention per decoder layer</h3>
+
+<div class="grid">
+<div class="note na">
+<b>Self-attention among queries</b><br>
+Q, K, V all come from the query vectors. Queries look at each other:<br>
+"Where are you placing your knot? I'll place mine somewhere different."<br>
+This prevents two queries from producing the same knot value.
+</div>
+<div class="note np">
+<b>Cross-attention to encoder memory</b><br>
+Q comes from queries, K and V come from encoder output:<br>
+Q = queries · W<sub>Q</sub><br>
+K = <span class="hlg">encoder_memory</span> · W<sub>K</sub><br>
+V = <span class="hlg">encoder_memory</span> · W<sub>V</sub><br><br>
+Each query asks the encoded points: "What geometry do I need?"
+</div>
+</div>
+
+<canvas id="cCross" height="300"></canvas>
+<div class="hint">Click a query (amber) to see which encoded points (green) it cross-attends to</div>
+
+<div class="eq">
+<b>Cross-attention shapes:</b><br>
+Q_cross = queries · W<sub>Q</sub> &nbsp;&nbsp;&nbsp;&nbsp;→ (K<sub>max</sub>+1) × 64 &nbsp;<span style="color:var(--fg2)">← from decoder</span><br>
+K_cross = memory · W<sub>K</sub> &nbsp;&nbsp;&nbsp;&nbsp;→ N × 64 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--fg2)">← from encoder</span><br>
+V_cross = memory · W<sub>V</sub> &nbsp;&nbsp;&nbsp;&nbsp;→ N × 64 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:var(--fg2)">← from encoder</span><br><br>
+scores = Q_cross · K_cross<sup>T</sup> / √16 &nbsp;→ (K<sub>max</sub>+1) × N<br>
+weights = softmax(scores) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ (K<sub>max</sub>+1) × N<br>
+output = weights · V_cross &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ (K<sub>max</sub>+1) × 64<br><br>
+<span style="color:var(--fg2)">Same Q·K<sup>T</sup>·V formula — just Q from one source, K and V from another.</span>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<section id="s11" class="sec">
+<h2><span class="step-num">11</span>Knot head: vectors → ordered numbers</h2>
+<p>Drag the raw scores to see the output head in action:</p>
+<div class="card">
+<div id="sliders" style="display:flex;gap:14px;flex-wrap:wrap;margin:0 0 10px"></div>
+<div id="knotOut" class="eq" style="line-height:2.0"></div>
+<canvas id="cKnot" height="55"></canvas>
+</div>
+<div class="note np">
+<b>The guarantee:</b> softplus(r) > 0 for any r → cumsum is strictly increasing → divide by total maps to (0,1). The output is <b>always valid and always ordered</b> by construction. No sorting, no constraint enforcement — the math makes it impossible to produce invalid knots.
+</div>
+
+<h3>The complete forward pass</h3>
+<div class="eq" style="line-height:2.4">
+6 points (x,y) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shape: (6, 2)<br>
+&nbsp;&nbsp;↓ extract 6 features each<br>
+6 feature tokens &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shape: (6, 6)<br>
+&nbsp;&nbsp;↓ Linear(6→64) + positional embedding<br>
+6 vectors in working space &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shape: (6, 64)<br>
+&nbsp;&nbsp;↓ <span class="hl">encoder layer 1</span>: self-attn + FFN<br>
+&nbsp;&nbsp;↓ <span class="hl">encoder layer 2</span>: self-attn + FFN<br>
+&nbsp;&nbsp;↓ <span class="hl">encoder layer 3</span>: self-attn + FFN<br>
+6 encoded vectors (encoder memory) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shape: (6, 64)<br>
+&nbsp;&nbsp;↓<br>
+5 learned query vectors &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shape: (5, 64)<br>
+&nbsp;&nbsp;↓ <span class="hla">decoder layer 1</span>: self-attn + cross-attn + FFN<br>
+&nbsp;&nbsp;↓ <span class="hla">decoder layer 2</span>: self-attn + cross-attn + FFN<br>
+&nbsp;&nbsp;↓ <span class="hla">decoder layer 3</span>: self-attn + cross-attn + FFN<br>
+5 decoded query vectors &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shape: (5, 64)<br>
+&nbsp;&nbsp;↓ MLP per query (64→32→1)<br>
+5 raw scores &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shape: (5,)<br>
+&nbsp;&nbsp;↓ softplus → cumsum → normalize<br>
+<b>4 interior knots in (0,1)</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;shape: (4,)<br>
+&nbsp;&nbsp;↓ → [0,0,0,0, u₁, u₂, u₃, u₄, 1,1,1,1]<br>
+&nbsp;&nbsp;↓ linear solve A(u)P = D̃<br>
+<span class="hlg">Control points → Curve → Curvature → <span class="hlr">Loss</span></span>
+</div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<script>
+var dk=matchMedia('(prefers-color-scheme:dark)').matches;
+var fg=dk?'#e8e6df':'#1a1a1a',fg2=dk?'#9c9a92':'#73726c',fg3=dk?'#73726c':'#a09e97';
+var bg=dk?'#1a1a1a':'#fafaf8',bg2=dk?'#2c2c2a':'#f0efeb',bd=dk?'#555':'#d3d1c7';
+var cols=['#E24B4A','#EF9F27','#1D9E75','#2E86DE'];
+var Q=[[.57,.25,-.21,.27],[.24,.86,.77,.15],[.03,.36,1.07,1.40],[.54,.38,-.11,.30]];
+var K=[[.41,-.07,.38,.15],[.49,.84,.93,.16],[.28,.33,.81,1.14],[.34,.06,.37,.24]];
+var V=[[.61,.33,.14,-.16],[.55,.65,1.01,.43],[.56,.56,.73,1.25],[.50,.42,.24,.00]];
+var scores=[[.11,.22,.13,.11],[.18,.69,.50,.18],[.17,.77,.86,.24],[.17,.33,.22,.15]];
+var weights=[[.246,.278,.252,.224],[.162,.346,.275,.217],[.170,.309,.339,.182],[.222,.272,.246,.260]];
+
+function showDot(i){
+var el=document.getElementById('dotDetail');
+var html='<b>Row '+i+' (D₊'+i+' asking):</b><br>';
+for(var j=0;j<4;j++){
+html+='scores['+i+']['+j+'] = Q₊'+i+' · K₊'+j+' = ';
+var terms=[];var sum=0;
+for(var d=0;d<4;d++){var p=Q[i][d]*K[j][d];terms.push('('+Q[i][d].toFixed(2)+')('+K[j][d].toFixed(2)+')');sum+=p}
+html+=terms.join(' + ')+' = '+sum.toFixed(3);
+html+=' → /√4 = <b>'+(sum/2).toFixed(3)+'</b><br>'}
+el.innerHTML=html}
+showDot(2);
+
+function showSm(i){
+var el=document.getElementById('smDetail');
+var exps=scores[i].map(function(s){return Math.exp(s)});
+var sum=exps.reduce(function(a,b){return a+b},0);
+var html='<b>Row '+i+':</b> exp(['+scores[i].map(function(s){return s.toFixed(2)}).join(', ')+']) = ['+exps.map(function(e){return e.toFixed(3)}).join(', ')+']<br>';
+html+='sum = '+sum.toFixed(3)+'<br>';
+html+='weights = ['+exps.map(function(e){return '<b>'+(e/sum).toFixed(3)+'</b>'}).join(', ')+']';
+el.innerHTML=html}
+
+function sc(cv){var r=cv.getBoundingClientRect();var dpr=window.devicePixelRatio||1;cv.width=r.width*dpr;cv.height=parseInt(cv.getAttribute('height'))*dpr;var c=cv.getContext('2d');c.scale(dpr,dpr);c.cw=r.width;c.ch=parseInt(cv.getAttribute('height'));return c}
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.quadraticCurveTo(x+w,y,x+w,y+r);c.lineTo(x+w,y+h-r);c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);c.lineTo(x+r,y+h);c.quadraticCurveTo(x,y+h,x,y+h-r);c.lineTo(x,y+r);c.quadraticCurveTo(x,y,x+r,y);c.closePath()}
+
+// Attention visualization
+var selA=2;
+function drawAttn(){
+var cv=document.getElementById('cAttn'),c=sc(cv),W=c.cw,H=c.ch;
+var gx=W/4,y1=24,y2=H-40;
+c.font='500 12px '+getComputedStyle(document.body).fontFamily;c.textAlign='center';
+c.fillStyle=fg2;c.fillText('Click a point to see its attention pattern:',W/2,14);
+for(var i=0;i<4;i++){var cx=gx*i+gx/2,bw=60;
+c.fillStyle=i===selA?cols[i]:(dk?'#3d3d3a':bg2);
+rr(c,cx-bw/2,y1,bw,32,6);c.fill();
+c.strokeStyle=cols[i];c.lineWidth=i===selA?2:.5;rr(c,cx-bw/2,y1,bw,32,6);c.stroke();
+c.fillStyle=i===selA?'#fff':fg;c.font='500 12px '+getComputedStyle(document.body).fontFamily;
+c.fillText('D₊'+i,cx,y1+20)}
+var w=weights[selA];
+for(var j=0;j<4;j++){var sx=gx*selA+gx/2,ex=gx*j+gx/2;
+c.strokeStyle=cols[selA]+(Math.round(60+w[j]*195).toString(16));
+c.lineWidth=Math.max(0.5,w[j]*12);
+c.beginPath();c.moveTo(sx,y1+32);c.bezierCurveTo(sx,y1+60,ex,y2-30,ex,y2);c.stroke();
+c.fillStyle=fg2;c.font='11px '+getComputedStyle(document.body).fontFamily;
+c.fillText(Math.round(w[j]*100)+'%',ex,y2+16)}
+c.fillStyle=fg2;c.font='11px '+getComputedStyle(document.body).fontFamily;c.textAlign='center';
+c.fillText('D₊'+selA+' pays '+Math.round(w[selA]*100)+'% attention to itself, '+Math.round(w[(selA+1)%4]*100)+'% to D₊'+((selA+1)%4),W/2,y2+34)}
+document.getElementById('cAttn').onclick=function(e){
+var r=this.getBoundingClientRect(),mx=e.clientX-r.left,gx=r.width/4;
+for(var i=0;i<4;i++){if(Math.abs(mx-(gx*i+gx/2))<gx/2){selA=i;drawAttn();return}}};
+drawAttn();
+
+// Multi-head visualization
+function drawHeads(){
+var cv=document.getElementById('cHeads'),c=sc(cv),W=c.cw,H=c.ch;
+var headW=(W-60)/4,ml=30;
+c.font='500 12px '+getComputedStyle(document.body).fontFamily;c.fillStyle=fg2;c.textAlign='center';
+c.fillText('64-d input split into 4 heads of 16-d each',W/2,16);
+var patterns=[
+[[.5,.3,.1,.1],[.2,.4,.3,.1],[.1,.3,.4,.2],[.1,.1,.3,.5]],
+[[.3,.1,.3,.3],[.1,.2,.1,.6],[.3,.1,.2,.4],[.3,.6,.1,.0]],
+[[.4,.1,.1,.4],[.1,.3,.3,.3],[.1,.3,.3,.3],[.4,.1,.1,.4]],
+[[.1,.3,.4,.2],[.3,.1,.2,.4],[.4,.2,.1,.3],[.2,.4,.3,.1]]];
+var hlabels=['Head 1: nearby','Head 2: curvature','Head 3: endpoints','Head 4: opposite'];
+for(var h=0;h<4;h++){var hx=ml+h*(headW+10),hy=36;
+rr(c,hx,hy,headW,H-70,8);c.fillStyle=bg2;c.fill();
+c.strokeStyle=cols[h]+'80';c.lineWidth=.5;rr(c,hx,hy,headW,H-70,8);c.stroke();
+c.fillStyle=cols[h];c.font='500 11px '+getComputedStyle(document.body).fontFamily;c.textAlign='center';
+c.fillText(hlabels[h],hx+headW/2,hy+18);
+var p=patterns[h],gy=(H-100)/4,gy0=hy+30;
+for(var i=0;i<4;i++)for(var j=0;j<4;j++){
+var x=hx+10+(headW-20)/4*j,y=gy0+gy*i,cw=(headW-20)/4-2,ch2=gy-3;
+var alpha=Math.round(p[i][j]*255).toString(16).padStart(2,'0');
+c.fillStyle=cols[h]+alpha;rr(c,x,y,cw,ch2,3);c.fill();
+if(p[i][j]>.25){c.fillStyle='#fff';c.font='10px '+getComputedStyle(document.body).fontFamily;
+c.textAlign='center';c.fillText(Math.round(p[i][j]*100)+'%',x+cw/2,y+ch2/2+3)}}
+c.fillStyle=fg3;c.font='10px '+getComputedStyle(document.body).fontFamily;c.textAlign='center';
+for(var i=0;i<4;i++){c.fillText('D'+i,hx+4,gy0+gy*i+gy/2+2)}}
+c.fillStyle=fg2;c.font='11px '+getComputedStyle(document.body).fontFamily;c.textAlign='center';
+c.fillText('Each 4×4 grid is one head\'s attention weight matrix (row=source, col=target)',W/2,H-8)}
+drawHeads();
+
+// Stacked layers
+function drawLayers(){
+var cv=document.getElementById('cLayers'),c=sc(cv),W=c.cw,H=c.ch;
+var bw=240,bh=52,gap=28,startY=30,cx=W/2;
+var layers=[
+{l:'Encoder layer 1',s:'Points learn about direct neighbors',c:'#7F77DD'},
+{l:'Encoder layer 2',s:'Points learn about neighbors\' neighbors',c:'#7F77DD'},
+{l:'Encoder layer 3',s:'Full global context encoded',c:'#7F77DD'}];
+c.fillStyle=fg2;c.font='500 12px '+getComputedStyle(document.body).fontFamily;c.textAlign='center';
+c.fillText('Each layer has its own W_Q, W_K, W_V, W_O, W₁, W₂',W/2,16);
+// Input
+var iy=startY;
+rr(c,cx-bw/2,iy,bw,36,6);c.fillStyle=bg2;c.fill();c.strokeStyle=bd;c.lineWidth=.5;
+rr(c,cx-bw/2,iy,bw,36,6);c.stroke();
+c.fillStyle=fg;c.font='500 12px '+getComputedStyle(document.body).fontFamily;
+c.fillText('Input: 4 tokens × 64-d (self only)',cx,iy+22);
+for(var i=0;i<3;i++){var ly=iy+36+gap+i*(bh+gap);
+c.strokeStyle=fg3;c.lineWidth=1;c.beginPath();c.moveTo(cx,ly-gap);c.lineTo(cx,ly);c.stroke();
+c.beginPath();c.moveTo(cx-4,ly-4);c.lineTo(cx,ly);c.lineTo(cx+4,ly-4);c.fill();
+rr(c,cx-bw/2,ly,bw,bh,8);c.fillStyle=layers[i].c+'18';c.fill();
+c.strokeStyle=layers[i].c;c.lineWidth=.5;rr(c,cx-bw/2,ly,bw,bh,8);c.stroke();
+c.fillStyle=fg;c.font='500 13px '+getComputedStyle(document.body).fontFamily;
+c.fillText(layers[i].l,cx,ly+20);
+c.fillStyle=fg2;c.font='11px '+getComputedStyle(document.body).fontFamily;
+c.fillText(layers[i].s,cx,ly+38);
+c.fillStyle=fg3;c.font='10px '+getComputedStyle(document.body).fontFamily;c.textAlign='right';
+c.fillText('self-attn + FFN',cx+bw/2-8,ly+bh+14);c.textAlign='center'}
+var oy=iy+36+gap+3*(bh+gap)-gap+20;
+c.strokeStyle=fg3;c.lineWidth=1;c.beginPath();c.moveTo(cx,oy-20);c.lineTo(cx,oy);c.stroke();
+rr(c,cx-bw/2,oy,bw,36,6);c.fillStyle='#1D9E75'+'18';c.fill();
+c.strokeStyle='#1D9E75';c.lineWidth=.5;rr(c,cx-bw/2,oy,bw,36,6);c.stroke();
+c.fillStyle=fg;c.font='500 12px '+getComputedStyle(document.body).fontFamily;
+c.fillText('Encoder memory: 4 × 64-d (global context)',cx,oy+22)}
+drawLayers();
+
+// Cross-attention demo
+var selD=0;
+var qLabels=['query₀','query₁','slack'];
+var crossW=[[.45,.30,.15,.10],[.08,.15,.35,.42],[.15,.20,.25,.40]];
+var qInterp=['Attends to start → places u₁','Attends to end → places u₂','Slack: absorbs remaining range'];
+function drawCross(){
+var cv=document.getElementById('cCross'),c=sc(cv),W=c.cw,H=c.ch;
+var qgx=W/3,y1=28,y2=H-60;
+c.font='500 12px '+getComputedStyle(document.body).fontFamily;c.fillStyle=fg2;c.textAlign='center';
+c.fillText('Cross-attention: queries (amber) read from encoder memory (green)',W/2,14);
+for(var i=0;i<3;i++){var cx2=qgx*i+qgx/2,bw=90;
+c.fillStyle=i===selD?'#EF9F27':(dk?'#444':'#FAEEDA');
+rr(c,cx2-bw/2,y1,bw,32,6);c.fill();
+c.strokeStyle=i===selD?'#BA7517':'#ccc';c.lineWidth=i===selD?2:.5;
+rr(c,cx2-bw/2,y1,bw,32,6);c.stroke();
+c.fillStyle=i===selD?'#fff':(dk?'#e8e6df':'#854F0B');
+c.font='500 11px '+getComputedStyle(document.body).fontFamily;
+c.fillText(qLabels[i],cx2,y1+20)}
+var egx=W/4;
+var w=crossW[selD];
+for(var j=0;j<4;j++){var sx=qgx*selD+qgx/2,ex=egx*j+egx/2;
+c.strokeStyle='rgba(127,119,221,'+(0.25+w[j]*0.75)+')';c.lineWidth=Math.max(0.5,w[j]*10);
+c.beginPath();c.moveTo(sx,y1+32);c.bezierCurveTo(sx,y1+70,ex,y2-40,ex,y2);c.stroke();
+c.fillStyle=fg2;c.font='10px '+getComputedStyle(document.body).fontFamily;c.textAlign='center';
+c.fillText(Math.round(w[j]*100)+'%',ex,y2+14)}
+for(var i=0;i<4;i++){var cx3=egx*i+egx/2,bw2=70;
+c.fillStyle=dk?'#085041':'#E1F5EE';rr(c,cx3-bw2/2,y2,bw2,32,6);c.fill();
+c.strokeStyle='#1D9E75';c.lineWidth=.5;rr(c,cx3-bw2/2,y2,bw2,32,6);c.stroke();
+c.fillStyle=dk?'#9FE1CB':'#085041';c.font='500 11px '+getComputedStyle(document.body).fontFamily;
+c.fillText('enc₊'+i,cx3,y2+20)}
+c.fillStyle=fg2;c.font='12px '+getComputedStyle(document.body).fontFamily;c.textAlign='center';
+c.fillText(qInterp[selD],W/2,y2+50)}
+document.getElementById('cCross').onclick=function(e){
+var r=this.getBoundingClientRect(),mx=e.clientX-r.left,gx=r.width/3;
+for(var i=0;i<3;i++){if(Math.abs(mx-(gx*i+gx/2))<gx/2){selD=i;drawCross();return}}};
+drawCross();
+
+// Knot head
+var nSliders=5;var sLabels=['r₀','r₁','r₂','r₃','slack'];
+var sVals=[5,-2,15,-5,8];
+var sl=document.getElementById('sliders');
+for(var i=0;i<nSliders;i++){
+var d=document.createElement('label');d.style.cssText='display:flex;align-items:center;gap:6px;font-size:12px;font-family:var(--m);color:var(--fg2)';
+d.innerHTML=sLabels[i]+' <input type="range" min="-30" max="30" value="'+sVals[i]+'" step="1" id="rs'+i+'" oninput="uKnot()" style="width:100px"><span id="rv'+i+'">'+((sVals[i]/10).toFixed(1))+'</span>';
+sl.appendChild(d)}
+function sp(x){return Math.log(1+Math.exp(x))}
+function uKnot(){
+var rv=[];for(var i=0;i<5;i++){rv[i]=+document.getElementById('rs'+i).value/10;
+document.getElementById('rv'+i).textContent=rv[i].toFixed(1)}
+var sv=rv.map(function(r){return sp(r)+.001});
+var cv=[],sum=0;for(var i=0;i<5;i++){sum+=sv[i];cv.push(sum)}
+var knots=[];for(var i=0;i<4;i++)knots.push(cv[i]/cv[4]);
+document.getElementById('knotOut').innerHTML=
+'<span class="hlr">raw r</span> = ['+rv.map(function(v){return v.toFixed(1)}).join(', ')+']<br>'+
+'<span class="hla">softplus s</span> = ['+sv.map(function(v){return v.toFixed(3)}).join(', ')+'] <span style="color:var(--fg2)">← all positive (softplus is always > 0)</span><br>'+
+'<span class="hlg">cumsum c</span> = ['+cv.map(function(v){return v.toFixed(3)}).join(', ')+'] <span style="color:var(--fg2)">← strictly increasing (positive increments)</span><br>'+
+'<span class="hl">knots u</span> = [<b>'+knots.map(function(v){return v.toFixed(4)}).join(', ')+'</b>] <span style="color:var(--fg2)">← in (0,1), guaranteed ordered</span>';
+var cvs=document.getElementById('cKnot'),ctx=sc(cvs);
+var W=ctx.cw,ml=16,bw=W-2*ml;
+ctx.fillStyle=bg2;rr(ctx,ml,6,bw,26,5);ctx.fill();ctx.strokeStyle=bd;ctx.lineWidth=.5;rr(ctx,ml,6,bw,26,5);ctx.stroke();
+for(var i=0;i<4;i++){var x=ml+knots[i]*bw;
+ctx.fillStyle='#7F77DD';ctx.beginPath();ctx.arc(x,19,7,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#fff';ctx.font='500 9px '+getComputedStyle(document.body).fontFamily;
+ctx.textAlign='center';ctx.fillText('u'+(i+1),x,22);
+ctx.fillStyle=fg;ctx.font='10px '+getComputedStyle(document.body).fontFamily;
+ctx.fillText(knots[i].toFixed(3),x,46)}
+ctx.fillStyle=fg3;ctx.font='10px '+getComputedStyle(document.body).fontFamily;
+ctx.textAlign='left';ctx.fillText('0',ml,46);ctx.textAlign='right';ctx.fillText('1',ml+bw,46)}
+uKnot();
+
+matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){
+dk=matchMedia('(prefers-color-scheme:dark)').matches;
+fg=dk?'#e8e6df':'#1a1a1a';fg2=dk?'#9c9a92':'#73726c';fg3=dk?'#73726c':'#a09e97';
+bg=dk?'#1a1a1a':'#fafaf8';bg2=dk?'#2c2c2a':'#f0efeb';bd=dk?'#555':'#d3d1c7';
+drawAttn();drawHeads();drawLayers();drawCross();uKnot()});
+window.addEventListener('resize',function(){drawAttn();drawHeads();drawLayers();drawCross();uKnot()});
+</script>
+</body>
+</html>
