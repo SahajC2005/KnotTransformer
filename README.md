@@ -88,16 +88,29 @@ KnotTransformer/
 │   ├── curvature_layer_nd.py           ← differentiable B-spline solver (nD)
 │   ├── curvatureLayer.py               ← backward-compat wrapper for thesis code
 │   ├── generalization_experiment.py    ← Phase 1 generalization experiment
-│   └── interpretability.py             ← 5 interpretability tools (attention, probing, etc.)
+│   ├── interpretability.py             ← 5 interpretability tools (attention, probing, etc.)
+│   ├── bspline3d.py                    ← pure-PyTorch nD B-spline + bending energy (batched)
+│   ├── knot_transformer_3d.py          ← d-dim KnotTransformer + 2D→3D warm-start loader
+│   ├── interactive_core.py             ← compute core for the interactive explorer
+│   ├── road_generator.py               ← synthetic road-like (approach→bend→exit) samples
+│   └── losses.py                       ← buffer-box control-point containment penalty
 │
 ├── notebooks/                          ← Colab/Jupyter notebooks
-│   ├── KnotTransformer_Phase2_v2.ipynb ← hardened GPU training notebook (recommended)
-│   └── RRRReeeaaaalllll_B_spline.ipynb ← full experiment notebook
+│   ├── CompleteKnotTransformer_V2.ipynb      ← hardened GPU training notebook
+│   ├── Transformer_Testing_V1.ipynb          ← earlier experiment notebook
+│   ├── Phase2_RoadFinetune.ipynb             ← multi-seed evals + road-like fine-tune (run 1)
+│   ├── Phase2_BufferBox.ipynb                ← buffer-box penalty + L-BFGS local-min analysis
+│   ├── Phase2_RealTurns_TripSplit.ipynb      ← trip-split real-turn fine-tune (WIP, not yet run)
+│   ├── Airfoil_UIUC_Eval.ipynb               ← UIUC airfoil benchmark with curvature combs
+│   └── KnotTransformer_3D_Interactive.ipynb  ← 2D/3D interactive explorer + batch CSV mode
 │
 ├── experiments/                        ← training & evaluation scripts
 │   ├── train_phase2_longer.py          ← resumable CPU/local training script
 │   ├── evaluate_phase2_final.py        ← final 500-sample evaluation
 │   ├── REPORT.md                       ← experiment report
+│   ├── airfoil/                        ← UIUC airfoil benchmark (optimizer upper bound)
+│   ├── local_min_lbfgs/                ← L-BFGS local-minimum analysis
+│   ├── road_finetune/                  ← real-turn transfer experiments
 │   └── results/                        ← saved evaluation JSON files
 │       ├── eval_dof2.json
 │       ├── eval_dof3.json
@@ -252,8 +265,8 @@ The transformer lands in high-quality basins (refined/best = 0.82) but not at th
 ## Known Limitations
 
 - **Output-head constraint:** The cumsum normalization reduces effective degrees of freedom by ~1. Mitigated by boundary rescaling; architectural fix deferred to future work.
-- **2D experiments only:** The solver supports nD; 3D experiments are in progress.
-- **Random uniform data:** No real-world geometric data tested.
+- **3D:** nD solver and 3D model exist (`src/bspline3d.py`, `src/knot_transformer_3d.py`); full 3D training results pending.
+- **Real-world data:** On real GPS turns the model is still worse than chordal after road-like fine-tuning (26.7% win, median ratio 1.661 on 15 turns) — see `experiments/road_finetune/`. The airfoil benchmark currently uses a per-instance optimizer, not the model — see `experiments/airfoil/`.
 - **Single baseline:** Compared against chordal only; centripetal and optimal baselines pending.
 
 ---
