@@ -1,0 +1,1477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KnotTransformer Internals</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+/* Layout: measure column for prose, wide bands for figures and tables.
+   Drafting neutrals biased blue, teal "parameter" accent, amber "energy /
+   violation" accent, red for clipped or failing values. */
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --sunk:#eceff4;
+  --ink:#131821; --muted:#5b6777; --faint:#9aa5b4; --rule:#d9dfe7;
+  --accent:#0f7c77; --accent-soft:#d6ecea;
+  --warn:#9a5208; --warn-soft:#f6e6d2; --bad:#a8232c; --bad-soft:#f7dedf;
+  --display:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --body:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117; --surface:#151b23; --sunk:#1b222c;
+    --ink:#e4eaf2; --muted:#8d9aab; --faint:#5e6b7c; --rule:#28313d;
+    --accent:#36c3ba; --accent-soft:#12302f;
+    --warn:#e0a44a; --warn-soft:#2c2114; --bad:#f0787f; --bad-soft:#331a1c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117; --surface:#151b23; --sunk:#1b222c;
+  --ink:#e4eaf2; --muted:#8d9aab; --faint:#5e6b7c; --rule:#28313d;
+  --accent:#36c3ba; --accent-soft:#12302f;
+  --warn:#e0a44a; --warn-soft:#2c2114; --bad:#f0787f; --bad-soft:#331a1c;
+  color-scheme:dark;
+}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.62;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+*,*::before,*::after{box-sizing:border-box}
+
+.band{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.col{max-width:70ch;margin:0 auto}
+.wide{max-width:106ch;margin:0 auto}
+
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--rule)}
+header.top .wide{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:baseline;padding-block:10px}
+header.top b{font-family:var(--display);font-weight:700;font-size:15px;min-width:0}
+header.top nav{display:flex;flex-wrap:wrap;gap:4px 14px;min-width:0}
+header.top a{font-family:var(--mono);font-size:11.5px;color:var(--muted);text-decoration:none;letter-spacing:.04em;text-transform:uppercase}
+header.top a:hover{color:var(--accent)}
+
+h1{font-family:var(--display);font-weight:700;font-size:clamp(30px,7vw,46px);line-height:1.08;letter-spacing:-.015em;text-wrap:balance;margin:0 0 .5rem}
+h2{font-family:var(--display);font-weight:700;font-size:clamp(21px,3.6vw,27px);line-height:1.18;letter-spacing:-.01em;text-wrap:balance;margin:0 0 .2rem}
+h3{font-family:var(--display);font-weight:500;font-size:17px;line-height:1.3;margin:0 0 .35rem;text-wrap:balance}
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 .5rem}
+.lede{font-size:19.5px}
+p{margin:0 0 1rem}
+.sub{color:var(--muted);font-size:15.5px}
+small.sub{font-size:13px;display:block;text-transform:none;letter-spacing:0}
+section{padding-block:clamp(34px,6vw,54px);border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0}
+.stack{display:flex;flex-direction:column;gap:1rem}
+ol.stack,ul.stack{padding-left:1.3em;margin:0 0 1rem}
+code,kbd{font-family:var(--mono);font-size:.86em;background:var(--sunk);padding:.12em .36em;border-radius:3px;word-break:break-word}
+
+pre{font-family:var(--mono);font-size:12.5px;line-height:1.6;background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--accent);border-radius:0 5px 5px 0;padding:14px 16px;margin:0 0 1rem;overflow-x:auto}
+pre b{color:var(--accent);font-weight:600}
+pre i{color:var(--muted);font-style:normal}
+pre u{color:var(--warn);text-decoration:none;font-weight:600}
+
+.callout{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px 18px;margin:0 0 1rem}
+.callout.key{border-left:3px solid var(--accent);background:var(--accent-soft)}
+.callout.flag{border-left:3px solid var(--warn)}
+.callout.sev{border-left:3px solid var(--bad);background:var(--bad-soft)}
+.callout p:last-child,.callout pre:last-child,.callout>div:last-child{margin-bottom:0}
+.callout h3{font-family:var(--display);font-weight:700;font-size:15px}
+
+.scroll{overflow-x:auto;margin:0 0 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+table.narrow{min-width:0}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--sunk);white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+td.m{font-family:var(--mono);font-size:12px}
+tr.hl td{background:var(--warn-soft)}
+tr.sum td{background:var(--sunk);font-weight:600}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:3px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.tag.on{background:var(--accent-soft);color:var(--accent)}
+.tag.no{background:var(--warn-soft);color:var(--warn)}
+
+.pipe{display:flex;flex-direction:column;gap:7px;margin:0 0 1rem}
+.stage{display:grid;grid-template-columns:28px 1fr;gap:0 14px;align-items:start;background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:12px 14px}
+.stage .idx{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent);padding-top:3px}
+.stage .what{font-family:var(--display);font-weight:500;font-size:15px;min-width:0}
+.stage .who{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:3px;min-width:0;word-break:break-word}
+.stage .shape{font-family:var(--mono);font-size:11.5px;color:var(--accent);margin-top:5px;min-width:0}
+.stage.flagged{border-left:3px solid var(--warn)}
+.arrow{text-align:center;font-family:var(--mono);font-size:12px;color:var(--rule);line-height:1;margin:-3px 0}
+
+figure{margin:0 0 1rem}
+figure svg{display:block;width:100%;height:auto;max-width:100%}
+figcaption{font-size:13.5px;color:var(--muted);margin-top:.6rem;text-wrap:pretty}
+.figwrap{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px}
+.figgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:1rem}
+.figgrid>*{min-width:0}
+svg text{font-family:var(--mono);font-size:9px;fill:var(--muted)}
+svg text.lbl{fill:var(--ink);font-size:9.5px}
+svg text.acc{fill:var(--accent);font-weight:600}
+svg text.wrn{fill:var(--warn);font-weight:600}
+svg text.bad{fill:var(--bad);font-weight:600}
+svg text.ttl{fill:var(--ink);font-family:var(--display);font-size:11px;font-weight:700}
+
+.viewer{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:16px}
+.vpanels{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.vpanels>figure{margin:0;min-width:0}
+.vhead{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;margin-bottom:6px}
+.vhead .nm{font-family:var(--display);font-weight:700;font-size:14px}
+.vhead .kv{font-family:var(--mono);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.controls{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)}
+.controls label{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.controls input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-family:var(--mono);font-size:10.5px;color:var(--muted)}
+.legend span{display:inline-flex;gap:5px;align-items:center}
+.legend i{width:16px;height:0;border-top-width:2px;border-top-style:solid;display:inline-block}
+.legend i.dash{border-top-style:dashed}
+.legend i.dot{width:8px;height:8px;border-radius:50%;border:0}
+
+.tool{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:18px}
+.tool .row{display:grid;gap:4px;margin-bottom:16px}
+.tool label{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tool .val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:14px}
+input[type=range]{width:100%;accent-color:var(--accent);margin:2px 0}
+.bars{display:flex;flex-direction:column;gap:9px}
+.bar{display:grid;grid-template-columns:minmax(0,96px) 1fr;gap:10px;align-items:center}
+.bar .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.bar .track{background:var(--sunk);border-radius:3px;height:22px;position:relative;overflow:hidden}
+.bar .fill{position:absolute;inset:0 auto 0 0;border-radius:3px;transition:width .18s ease}
+.bar .fill.e{background:var(--accent)}
+.bar .fill.p{background:var(--warn)}
+.bar .num{position:absolute;top:0;bottom:0;right:8px;display:flex;align-items:center;font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.verdict{margin-top:16px;padding:12px 14px;border-radius:5px;font-size:14.5px;background:var(--sunk);border-left:3px solid var(--muted)}
+.verdict.ok{background:var(--accent-soft);border-left-color:var(--accent)}
+.verdict.bad{background:var(--warn-soft);border-left-color:var(--warn)}
+.verdict.sev{background:var(--bad-soft);border-left-color:var(--bad)}
+.verdict b{font-family:var(--display)}
+
+footer{border-top:1px solid var(--rule);padding-block:28px;color:var(--muted);font-size:13.5px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:560px){
+  body{font-size:16px}
+  .lede{font-size:18px}
+  .stage{grid-template-columns:1fr;gap:6px}
+  .stage .idx{padding-top:0}
+}
+
+/* standalone-only: supplied by the artifact host when published */
+[hidden]{display:none!important}
+img{max-width:100%}
+body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+
+<header class="top band">
+  <div class="wide">
+    <b>KnotTransformer Internals</b>
+    <nav>
+      <a href="#map">Classes</a>
+      <a href="#budget">Parameters</a>
+      <a href="#forward">Forward</a>
+      <a href="#attn">Attention</a>
+      <a href="#head">Head</a>
+      <a href="#engine">Solver</a>
+      <a href="#curves">Curves</a>
+      <a href="#quad">Quadrature</a>
+      <a href="#box">Buffer box</a>
+      <a href="#localmin">Local min</a>
+      <a href="#bugs">Defects</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="band">
+  <div class="col stack">
+    <p class="eyebrow">Phase 2 · Buffer Box</p>
+    <h1>The engine under the knots</h1>
+    <p class="lede">How <code>KnotTransformer</code> turns N points into a knot vector, how the differentiable B-spline solver turns that vector into a curvature number, and what goes wrong at both ends of that chain.</p>
+
+    <div class="callout key">
+      <h3>The fact everything else hangs off</h3>
+      <p>In <code>construct_A</code> the collocation rows are evaluated at <code>t = knots[3 … N+2]</code>, which for a clamped vector is exactly <code>[0, u₁ … u_K, 1]</code>. So the interior knots are <em>simultaneously</em> the knot vector and the parameter values assigned to the data points.</p>
+      <p>When the model emits <code>u₂ = 0.7</code> it is saying <em>“data point 2 sits at t = 0.7 along the curve.”</em> That is what “pacing” means, and it is the only quantity in the system that is free.</p>
+    </div>
+
+    <p>For N data points a clamped cubic B-spline has N&nbsp;+&nbsp;6 knots, N&nbsp;+&nbsp;2 control points and <strong>K = N&nbsp;&minus;&nbsp;2 free interior knots</strong>. The control points are not free — they fall out of a square solve <code>A(u)·P = D̃</code>. Interpolation is therefore free for any valid knot vector; only the shape changes. No fit-versus-smoothness trade-off exists, which is what makes the training self-supervised: there is no label, only an objective.</p>
+
+    <pre>E(u) = &#8747;&#8320;&#185; &#954;(t)&#178; &#183; &#8214;C&#8242;(t)&#8214; dt        <i># squared curvature, integrated over arc length</i></pre>
+
+    <div class="callout">
+      <h3>Everything below the diagrams is computed, not quoted</h3>
+      <p>This page carries a JavaScript port of <code>curvature_layer_nd.py</code> — Cox–de Boor basis, the collocation matrix with its natural end rows, the linear solve, the derivative recursions and the quadrature. It runs on the sample points stored in the notebook and reproduces the notebook's own energies to five significant figures:</p>
+      <div id="verify"></div>
+      <p class="sub" style="margin-top:.7rem">Interpolation residual at every data point is below 1e-7, so these really are curves through the points. Having an independent implementation is what let the quadrature problem in section 08 surface at all.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="map">
+  <div class="wide stack">
+    <p class="eyebrow">01 · Inventory</p>
+    <h2>Every class in the repository</h2>
+    <p class="sub">Eleven classes across five files. Note what is <em>not</em> here: the solver has none at all.</p>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Class</th><th>Defined at</th><th>Base</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td class="m"><strong>KnotTransformer</strong></td><td class="m">knot_transformer.py:167</td><td class="m">nn.Module</td><td>The 2-D model. <span class="tag on">used by Phase2_BufferBox</span></td></tr>
+          <tr><td class="m"><strong>BSplineDataset</strong></td><td class="m">knot_transformer.py:95</td><td class="m">Dataset</td><td>Mixed-N samples as <code>{points, heuristic, num_knots}</code>. <span class="tag on">used</span></td></tr>
+          <tr><td class="m">Phase1Trainer</td><td class="m">knot_transformer.py:324</td><td class="m">—</td><td>L1 loss against chordal knots. Produces <code>phase1_generalization.pt</code>.</td></tr>
+          <tr><td class="m">Phase2Trainer</td><td class="m">knot_transformer.py:418</td><td class="m">—</td><td>Reference energy fine-tuner, one sample at a time. <span class="tag no">bypassed</span> — the notebook writes its own <code>train_one_epoch</code> for N-grouped batching.</td></tr>
+          <tr><td class="m">KnotTransformerND</td><td class="m">knot_transformer_nd.py:183</td><td class="m">nn.Module</td><td>Same architecture, <code>input_proj = Linear(spatial_dim + 4, d_model)</code>.</td></tr>
+          <tr><td class="m">BSplineDatasetND</td><td class="m">knot_transformer_nd.py:108</td><td class="m">Dataset</td><td>n-D sample store, paired with <code>collate_nd</code>.</td></tr>
+          <tr><td class="m">Phase1TrainerND</td><td class="m">knot_transformer_nd.py:339</td><td class="m">—</td><td>n-D pretraining.</td></tr>
+          <tr><td class="m">Phase2TrainerND</td><td class="m">knot_transformer_nd.py:404</td><td class="m">—</td><td>n-D energy fine-tuning.</td></tr>
+          <tr><td class="m">KnotTransformer3D</td><td class="m">knot_transformer_3d.py:34</td><td class="m">nn.Module</td><td>3-D variant. Queries are a raw <code>nn.Parameter</code>, not an <code>nn.Embedding</code> — hence <code>warm_start_from</code> to bridge the 2-D checkpoint.</td></tr>
+          <tr><td class="m">AttentionCapture</td><td class="m">interpretability.py:81</td><td class="m">nn.Module</td><td>Hooks an attention layer and records its weight matrix.</td></tr>
+          <tr><td class="m">LocalAttentionMask</td><td class="m">interpretability.py:322</td><td class="m">—</td><td>Banded mask generator for the attention-ablation study.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <h3>The engine is deliberately not object-oriented</h3>
+      <p><code>curvature_layer_nd.py</code> and <code>bspline3d.py</code> define <strong>zero classes</strong>. Every piece of B-spline maths is a free function over tensors: <code>construct</code>, <code>construct_A</code>, <code>solve_nd</code>, <code>de_boor</code>, <code>first_derivative_nd</code>, <code>second_derivative_nd</code>, <code>local_curvature_nd</code>, <code>global_curvature_nd</code>, <code>arc_nd</code>, <code>chordal_nd</code>, <code>centripetal_nd</code>, <code>dup</code>, plus the 2-D aliases <code>solve</code>, <code>global_curvature</code>, <code>arc</code>.</p>
+      <p>That split is the right one. The model carries state and gets subclassed three ways; the solver is a pure function from <code>(points, knots)</code> to a scalar, so it needs no identity — and that is exactly what lets autograd treat it as one differentiable block.</p>
+    </div>
+
+    <p>The one piece of state the engine <em>does</em> carry is a module-level <code>device</code> global at <code>curvature_layer_nd.py:28</code>, with <code>.to(device)</code> on every internal temporary. That single mutable global is the origin of two separate failure modes further down this page.</p>
+  </div>
+</section>
+
+<section class="band" id="budget">
+  <div class="wide stack">
+    <p class="eyebrow">02 · Weights</p>
+    <h2>Where the 353,793 parameters live</h2>
+    <p class="sub"><code>d_model = 64</code>, <code>nhead = 4</code>, <code>dim_feedforward = 256</code>, 3 encoder and 3 decoder layers. The total reconciles exactly against the figure the notebook prints.</p>
+
+    <div class="figgrid">
+      <figure class="figwrap">
+        <div id="budgetChart"></div>
+        <figcaption>Six generic transformer layers are 99% of the model. Everything problem-specific — the feature projection, the positional table, the six knot queries, the monotone head — is 3,585 parameters.</figcaption>
+      </figure>
+      <div class="stack">
+        <div class="callout">
+          <h3>One encoder layer — 49,984</h3>
+          <pre>self_attn.in_proj_weight  <b>12,288</b>  <i>192&times;64</i>
+self_attn.in_proj_bias       <b>192</b>
+self_attn.out_proj         <b>4,160</b>  <i>64&times;64+64</i>
+linear1                   <b>16,640</b>  <i>256&times;64+256</i>
+linear2                   <b>16,448</b>  <i>64&times;256+64</i>
+norm1 + norm2                <b>256</b></pre>
+        </div>
+        <div class="callout">
+          <h3>One decoder layer — 66,752</h3>
+          <pre>self_attn                 <b>16,640</b>  <i>queries&harr;queries</i>
+multihead_attn            <b>16,640</b>  <i>queries&harr;memory</i>
+linear1                   <b>16,640</b>
+linear2                   <b>16,448</b>
+norm1 + norm2 + norm3        <b>384</b></pre>
+        </div>
+      </div>
+    </div>
+    <p>There is no final <code>LayerNorm</code>: <code>nn.TransformerEncoder</code> is built with <code>norm=None</code>, confirmed by the exact reconciliation. The clever part of this architecture is tiny; almost all its capacity is generic sequence modelling.</p>
+  </div>
+</section>
+
+<section class="band" id="forward">
+  <div class="wide stack">
+    <p class="eyebrow">03 · Sequence</p>
+    <h2>The forward pass, with shapes</h2>
+
+    <div class="pipe">
+      <div class="stage"><div class="idx">01</div><div>
+        <div class="what">Featurise</div>
+        <div class="who">compute_geometric_features() · knot_transformer.py:34</div>
+        <div class="shape">(B, N, 2) → concat 4 features → (B, N, 6)</div></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="idx">02</div><div>
+        <div class="what">Project and place</div>
+        <div class="who">input_proj · nn.Linear(6, 64) + point_pos_embed · nn.Embedding(10, 64)</div>
+        <div class="shape">(B, N, 6) → (B, N, 64)</div></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="idx">03</div><div>
+        <div class="what">Encode — self-attention over points</div>
+        <div class="who">encoder · nn.TransformerEncoder, 3 layers, src_key_padding_mask</div>
+        <div class="shape">(B, N, 64) → memory (B, N, 64)</div></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="idx">04</div><div>
+        <div class="what">Decode — 6 learned knot queries cross-attend</div>
+        <div class="who">knot_queries · nn.Embedding(6, 64) → decoder · nn.TransformerDecoder, 3 layers</div>
+        <div class="shape">(B, 6, 64) × memory → decoded (B, 6, 64)</div></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage flagged"><div class="idx">05</div><div>
+        <div class="what">Monotone head — softplus, cumsum, normalise</div>
+        <div class="who">knot_head · nn.Sequential · knot_transformer.py:272</div>
+        <div class="shape">(B, 6, 64) → (B, 6) ordered knots · last one pinned to 1.0</div></div></div>
+      <div class="arrow">↓</div>
+      <div class="stage"><div class="idx">06</div><div>
+        <div class="what">Rescale, clamp, assemble knot vector</div>
+        <div class="who">rescale_interior(eps=0.02) → cat([0⁴, u, 1⁴])</div>
+        <div class="shape">(B, K) → (B, N+6)</div></div></div>
+    </div>
+
+    <h3>The four input features</h3>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Feature</th><th>Computation</th><th>What it encodes</th></tr></thead>
+        <tbody>
+          <tr><td class="m">chord_cum</td><td class="m">cumsum(‖Δp‖) / total</td><td>The chordal heuristic itself, handed to the network as an input</td></tr>
+          <tr><td class="m">local_frac</td><td class="m">‖Δpᵢ‖ / total</td><td>This segment's share of the arc</td></tr>
+          <tr><td class="m">angles</td><td class="m">atan2(cross, dot) → [0,1]</td><td><strong>Turning angle.</strong> The one thing chordal and centripetal both ignore. Endpoints get 0.</td></tr>
+          <tr><td class="m">centri_cum</td><td class="m">cumsum(√‖Δp‖) / total</td><td>The centripetal heuristic</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The intent is explicit: hand the model the two baselines it must beat plus the missing signal, so Phase 1 (“predict chordal”) is close to a copy operation and Phase 2 only learns a correction. That is also why <code>lr = 1e-5</code> suffices — Phase 2 is a nudge, not a training run.</p>
+  </div>
+</section>
+
+<section class="band" id="attn">
+  <div class="wide stack">
+    <p class="eyebrow">04 · Attention</p>
+    <h2>What the two attention stacks do here</h2>
+
+    <pre>Q = H&#183;W_Q    K = H&#183;W_K    V = H&#183;W_V       <i># in_proj_weight, one 192&times;64 matrix, split in three</i>
+scores  = Q&#183;K&#7488; / &#8730;d_k                        <i># d_k = 64 / 4 heads = <b>16</b></i>
+weights = softmax(scores)                     <i># masked at padded positions</i>
+out     = weights&#183;V &#8594; out_proj              <i># 64&times;64 back to d_model</i></pre>
+
+    <p><strong>Encoder self-attention, N&times;N.</strong> Each point attends to every other. This is the capability the baselines structurally lack: chordal spacing is <em>local</em>, one chord length at a time, so knot placement near point 2 cannot react to a tight bend at point 5.</p>
+    <p><strong>Decoder cross-attention, 6&times;N.</strong> Six learned query vectors, one per knot slot, each cross-attending to the point memory and emitting one knot. Parallel, DETR-style, not autoregressive. The decoder also self-attends among the six queries, which is how slot 3 coordinates with slot 2 rather than duplicating it.</p>
+
+    <div class="callout key">
+      <h3>This is the length-generalisation mechanism</h3>
+      <p>The encoder absorbs any N ≤ 10 through attention plus a padding mask. The decoder slot count is fixed at <code>max_knots = 6</code> and you read the first K. Training on N ∈ {4, 5} exercises <strong>slots 0–2 only</strong>. At N = 8 (K = 6) slots 3, 4 and 5 fire for the first time in their existence.</p>
+    </div>
+
+    <figure class="figwrap">
+      <div id="extrapChart"></div>
+      <figcaption>Cell 35, 500 fresh samples per N, mean of the available seeds with the spread as a range bar. <code>degenerate: 0</code> and 500/500 valid at every N, including N = 8 where half the decoder slots had never been trained. Untrained query slots are not pathological — and the ratio at N = 8 is the best of the five. Part of that improvement is the chordal baseline degrading faster with N than the model does, not the model improving.</figcaption>
+    </figure>
+
+    <div class="callout flag">
+      <h3>Two seeds, not three</h3>
+      <p>The top-level README reports <code>75.7% ± 4.0%</code> over three seeds. Both multi-seed cells in this notebook print <code>Skipping seed 20260526 — no checkpoint</code> and then <code>(2 seeds)</code>. Whatever produced the three-seed figure, these stored outputs are not it — so the spread above is a two-point range, not a standard deviation worth quoting.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="head">
+  <div class="wide stack">
+    <p class="eyebrow">05 · Output head</p>
+    <h2>Ordering for free, and the degree of freedom it costs</h2>
+
+    <pre>raw        = self.knot_head(decoded).squeeze(-1)        <i># (B, 6)</i>
+increments = F.softplus(raw) + 1e-6                     <i># strictly positive</i>
+cum        = torch.cumsum(increments, dim=-1)           <i># strictly increasing</i>
+knot_vals[b, :K] = cum[b, :K] / (<u>cum[b, K-1]</u> + 1e-8)   <i># &#8594; (0, 1]</i></pre>
+
+    <p>Positive increments then a cumulative sum give strictly increasing knots by construction. No sorting, no constrained optimisation, fully differentiable — genuinely elegant, and why the model never emits an out-of-order knot vector.</p>
+
+    <div class="callout flag">
+      <h3>But look at the divisor</h3>
+      <p>It divides by <code>cum[b, K-1]</code> — the <em>last element of the slice it is normalising</em>. So <code>knot_vals[b, K-1] == 1.0</code> identically, for every input, by algebra. The last predicted knot carries zero information.</p>
+      <p><strong>K knots in, K&nbsp;&minus;&nbsp;1 real degrees of freedom out.</strong> Architectural, not a training artifact.</p>
+      <p>1.0 is also a <em>degenerate</em> knot — it collides with the clamped end knots and makes <code>A</code> singular. Hence the band-aid at <code>generalization_experiment.py:98</code>: <code>rescale_knots_to_interior</code> maps [0,1] into [0.02, 0.98].</p>
+    </div>
+
+    <p>You can read the pin straight out of the stored output. Cell 43:</p>
+    <pre>Model &#954;: 107.65, knots: [0.15122412 0.27244648 0.90013417 <u>0.97999999</u>]</pre>
+    <p>That trailing <code>0.97999999</code> is <code>0.02 + 0.96 × 1.0</code>. It is not a prediction. <strong>Every model output in this repository ends in 0.98.</strong> The fix is already written elsewhere in the same notebook — cell 45's refiner parameterises K knots from K&nbsp;+&nbsp;1 unconstrained reals:</p>
+    <pre>def gaps_to_knots(theta):          <i># theta: (K+1,) unconstrained</i>
+    w  = torch.softmax(theta, dim=0)    <i># K+1 positive weights summing to 1</i>
+    cs = torch.cumsum(w, dim=0)[:-1]    <i># K strictly increasing values in (0,1)</i>
+    return EPS_KNOT + (1 - 2*EPS_KNOT) * cs</pre>
+    <p>Predicting K&nbsp;+&nbsp;1 increments and slicing K recovers the lost degree of freedom and removes the need for the rescale entirely. Two lines in the head.</p>
+  </div>
+</section>
+
+<section class="band" id="engine">
+  <div class="wide stack">
+    <p class="eyebrow">06 · Engine</p>
+    <h2>The differentiable solver</h2>
+
+    <pre>u  &#8594; <b>construct</b>            <i># Cox&#8211;de Boor basis values at a parameter t</i>
+   &#8594; <b>construct_A</b>          <i># (N+2)&#215;(N+2) collocation + natural end rows</i>
+   &#8594; <b>solve_nd</b>             <i># C = inv_ex(A) &#183; D&#771;    &#8592; the differentiable bottleneck</i>
+   &#8594; <b>first_derivative_nd</b>  <i># Q&#7522; = 3(C&#7522;&#8330;&#8321;&#8722;C&#7522;)/&#916;u</i>
+   &#8594; <b>second_derivative_nd</b> <i># R&#7522; = 2(Q&#7522;&#8330;&#8321;&#8722;Q&#7522;)/&#916;u</i>
+   &#8594; <b>de_boor</b>              <i># evaluate r&#8242;, r&#8243; at quadrature points</i>
+   &#8594; <b>global_curvature_nd</b>  <i># &#8747; &#954;&#178;&#183;speed dt  &#8594; scalar per sample</i></pre>
+
+    <div class="figgrid">
+      <figure class="figwrap">
+        <div id="matrixFig"></div>
+        <figcaption>Teal cells are interpolation rows — the 4-wide band is the local support of a cubic basis. Amber rows are the natural end conditions. The single cells at <code>t = 0</code> and <code>t = 1</code> are clamping: <code>C(0) = P₀</code>, <code>C(1) = P₇</code>, the latter hardcoded because <code>construct</code>'s intervals are half-open.</figcaption>
+      </figure>
+
+      <div class="stack">
+        <div class="callout">
+          <h3>Deriving the cryptic end row</h3>
+          <pre>A[:, 0, 0] +=  knots[:, 5]
+A[:, 0, 1] += -knots[:, 4] - knots[:, 5]
+A[:, 0, 2] +=  knots[:, 4]</pre>
+          <p>With <code>u₁ = knots[4]</code>, <code>u₂ = knots[5]</code>: <code>Q₀ = 3(P₁−P₀)/u₁</code>, <code>Q₁ = 3(P₂−P₁)/u₂</code>, and <code>R₀ ∝ (Q₁ − Q₀)</code>. Setting <code>C″(0) = R₀ = 0</code>:</p>
+          <pre>u&#8322;&#183;P&#8320; &#8722; (u&#8321;+u&#8322;)&#183;P&#8321; + u&#8321;&#183;P&#8322; = 0</pre>
+          <p>Exactly those coefficients. So: <strong>clamped knot vector, natural end conditions.</strong> Both descriptions in the repo are right; they describe different things. Reproducing this row is what made the port match to five figures.</p>
+        </div>
+        <div class="callout flag">
+          <h3>The lever that makes knots matter</h3>
+          <pre>Q[:, i] = 3 / (knots[:, i+4] - knots[:, i+1] <u>+ 1e-12</u>) * (C[:, i+1] - C[:, i])</pre>
+          <p>That denominator is a knot <em>difference</em>. Push two knots together and <code>Q</code> blows up. This is how spacing controls velocity and therefore curvature — and <code>1e-12</code> is all that stands between the model and a division by zero.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>The gradient that ties it together</h3>
+    <p><code>solve_nd</code> forms the explicit inverse with <code>torch.linalg.inv_ex</code>, which is differentiable, so autograd silently derives implicit differentiation through the solve:</p>
+    <pre>&#8706;P/&#8706;u&#8342; = &#8722;A&#8315;&#185; (&#8706;A/&#8706;u&#8342;) P</pre>
+    <div class="callout key">
+      <p>That formula appears nowhere in the source. PyTorch derives it. It is the one ingredient connecting “where the knots are” to “what shape the curve is” differentiably, and it is what lets a curvature number at the end of the pipeline update transformer weights at the start.</p>
+    </div>
+    <p><code>inv_ex</code> was chosen over a <code>solve</code> deliberately: it returns an info code instead of raising on a singular matrix. A degenerate knot vector therefore yields inf/NaN control points quietly, caught downstream by <code>torch.isfinite</code>. Convenient — and, as the buffer box shows, a trap.</p>
+  </div>
+</section>
+
+<section class="band" id="curves">
+  <div class="wide stack">
+    <p class="eyebrow">07 · What the knots do</p>
+    <h2>The same six points, two parameterisations</h2>
+    <p class="sub">The notebook's cell-42 sample, solved on this page. Both curves pass through all six points exactly — that part is free. Everything different between them is the knot vector. Watch the frame size: the two panels are not at the same scale by default.</p>
+
+    <div class="viewer">
+      <div class="vpanels" id="curvePanels"></div>
+      <div class="controls">
+        <label><input type="checkbox" id="cZoom"> Zoom to the data box</label>
+        <label><input type="checkbox" id="cComb" checked> Curvature comb</label>
+        <label><input type="checkbox" id="cCtrl" checked> Control polygon</label>
+        <label><input type="checkbox" id="cBox"> Buffer box (25%)</label>
+      </div>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--accent)"></i> waypoint</span>
+        <span><i class="dot" style="background:var(--muted)"></i> control point</span>
+        <span><i class="dot" style="background:var(--bad)"></i> control point outside the box</span>
+        <span><i style="border-color:var(--ink)"></i> curve</span>
+        <span><i class="dash" style="border-color:var(--faint)"></i> data bounding box</span>
+        <span><i style="border-color:var(--warn)"></i> curvature comb</span>
+      </div>
+      <p class="sub" style="margin:14px 0 0">Comb teeth point along the signed normal and are normalised <em>per panel</em> to that panel's own 90th-percentile curvature, because the two curves differ in κ by more than an order of magnitude — the combs show where each curve bends, and are not comparable between panels. The chart below is the comparable view.</p>
+    </div>
+
+    <figure class="figwrap">
+      <div id="kappaProfile"></div>
+      <figcaption>κ along the curve for both knot vectors, shared log axis. This is the honest comparison. The chordal curve carries a narrow spike two orders of magnitude above its own median; the model's is flatter and lower almost everywhere. That is a real reduction in bending — and the next panel shows what it cost.</figcaption>
+    </figure>
+
+    <figure>
+      <div id="knotLines"></div>
+      <figcaption>The knot vectors themselves. Chordal spreads its four knots roughly in proportion to chord length. The model drives two to each boundary with gaps of 0.011 and 0.013 — which the <code>3/Δu</code> factor in the derivative recursion converts into enormous control-point excursions.</figcaption>
+    </figure>
+
+    <div class="callout sev">
+      <h3>The model's “smoother” curve is ten times the size of the data</h3>
+      <div id="extentReadout"></div>
+      <p style="margin-top:.8rem">The model's curve is not smoother in any everyday sense — it is <em>bigger</em>. It leaves the neighbourhood of the data entirely, sweeps a wide arc, and comes back through the remaining points. Take <code>E(u) = ∫ κ² ds</code> and let the interpolant detour at radius R: <code>κ ≈ 1/R</code> so <code>κ² ≈ 1/R²</code>, while the detour's arc length grows like <code>R</code>. The contribution goes like <code>R · 1/R² = 1/R</code>.</p>
+      <p><strong>Bigger loops have lower bending energy.</strong> The objective actively rewards ballooning outward and there is no arc-length term anywhere to stop it. A tenfold energy drop is a formally correct answer to the stated problem and a geometrically useless curve. This is why the model scores 68% on synthetic clouds and <strong>13%</strong> on real GPS turns: on a road, nobody wants the balloon.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="quad">
+  <div class="wide stack">
+    <p class="eyebrow">08 · Quadrature</p>
+    <h2>The energies are grid artifacts</h2>
+    <p class="sub">This is the one finding on the page that came out of building the figures rather than out of reading the code, and it is the most consequential.</p>
+
+    <p><code>global_curvature_nd</code> integrates <code>κ²·speed</code> on a uniform grid of <code>num_pts</code> samples — 100 in every evaluation path, 50 during this notebook's training. Run the same integral at increasing resolution and it does not settle until roughly 1,600 points:</p>
+
+    <figure class="figwrap">
+      <div id="convChart"></div>
+      <figcaption>The repository's own quadrature formula, same two curves, resolution swept. Dashed lines are the converged values. The two resolutions the code actually uses are marked.</figcaption>
+    </figure>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>num_pts</th><th class="n">Chordal κ</th><th class="n">Model κ</th><th class="n">Ratio</th><th>Used by</th></tr></thead>
+        <tbody id="convRows"></tbody>
+      </table>
+    </div>
+
+    <p>The integrand is the problem. It peaks at <strong>6.3 × 10⁵</strong> at <code>t = 0.570</code> on the chordal curve while its median is about 1 — three orders of magnitude of dynamic range concentrated in a spike narrower than the grid spacing. A 100-point grid has <code>Δt = 0.0101</code> and simply steps over it. Which samples happen to land near the peak then determines the answer, so the number is an aliasing artifact rather than an approximation.</p>
+
+    <div class="callout sev">
+      <h3>Three things this breaks</h3>
+      <ol class="stack" style="margin-bottom:0">
+        <li><strong>Absolute κ is wrong by 2–12×.</strong> On this sample the evaluation setting reports 711.5 against a true 2855.4 for chordal, and 68.4 against 139.2 for the model.</li>
+          <li><strong>The ratio is wrong by about 2×.</strong> <code>num_pts = 100</code> gives 0.0962; the converged value is 0.0487. The ratio is the project's headline metric.</li>
+        <li><strong>The training objective is a different function from the evaluation metric.</strong> At <code>N_QUAD = 50</code> the same two curves read 4936.8 and 16.1 — a ratio of <strong>0.0033</strong>, off by a factor of 15, and wrong in the opposite direction for each curve. Phase 2 was not minimising a noisy version of the eval metric; it was minimising a different quantity.</li>
+      </ol>
+    </div>
+
+    <p>Two caveats on scope, both important. This is <em>one</em> sample, and it was selected by cell 42 precisely for being hard (<code>chord κ &gt; 500</code>), so it is the worst case rather than the typical one. And medians over 500 samples are more robust than any single value — aliasing error that is roughly symmetric across a population partly cancels in a median. Whether it does here is an open question that one sweep would answer: recompute the stored evaluation sets at <code>num_pts = 2000</code> and see whether the win rates and ratios move. Until that is run, every absolute κ and every ratio in the repository should be treated as resolution-dependent.</p>
+
+    <div class="callout flag">
+      <h3>The fix is cheap</h3>
+      <p>Adaptive quadrature, or simply a much denser uniform grid — the integrand is smooth between spikes, so 2,000 points converges and costs 20× a forward pass of the solver, which is nothing next to training. For the training loop, where cost does matter, integrate on a grid refined near the knots, since that is where <code>3/Δu</code> puts the spikes. Separately, the endpoint weights in <code>(h/3)·(4·S1 + 2·S2)</code> give the two end samples weight 2 instead of 1; that error is about 1% and is the least of the problems here.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="box">
+  <div class="wide stack">
+    <p class="eyebrow">09 · Buffer box</p>
+    <h2>A correct idea at a catastrophic weight</h2>
+
+    <p>You cannot easily penalise “the curve went too far” — that needs sampling and is non-smooth. But a B-spline lies inside the convex hull of its control points, so containing the control points contains the curve. And the control points are right there as the solver's output, differentiable with respect to the knots. Tick <strong>Buffer box</strong> in the viewer above to see which escape.</p>
+
+    <div class="figgrid">
+      <div class="callout">
+        <h3>losses.py — the whole penalty</h3>
+        <pre>lo     = pts_g.min(dim=1).values              <i># (G,2)</i>
+hi     = pts_g.max(dim=1).values              <i># (G,2)</i>
+center = (0.5*(lo+hi)).unsqueeze(1)
+half   = (0.5*(hi-lo)*(1.0+<b>0.25</b>)).unsqueeze(1)
+excess = torch.clamp((Cc-center).abs()-half, min=0.0)
+return (excess ** 2)<u>.sum()</u></pre>
+        <p><strong>Squared</strong>, so the penalty is C¹ at the box boundary — a plain <code>|excess|</code> would have a gradient kink there and fight Adam. <strong>Summed</strong> over G samples × (N+2) control points × 2 axes with no normalisation: an N = 8 sample has 10 control points against an N = 6 sample's 8, so identical geometric badness costs 25% more. This fine-tune mixes N ∈ {6, 7, 8}, so the penalty is silently N-biased.</p>
+      </div>
+      <div class="stack">
+        <div class="callout key">
+          <h3>Its gradient uses the energy's own path</h3>
+          <p><code>C</code> is not a free parameter — it came from the solve. So <code>∂penalty/∂θ = ∂penalty/∂C · (−A⁻¹(∂A/∂u)P) · ∂u/∂θ</code>. The model has no control points to move; it is being told <em>“choose knots whose induced solve keeps the control points near the data.”</em> Same mechanism as the objective, second term.</p>
+        </div>
+        <div class="callout">
+          <h3>Measured on this page</h3>
+          <p>Computed exactly as <code>losses.py</code> does, for the two knot vectors in the viewer:</p>
+          <div id="boxReadout"></div>
+          <p class="sub" style="margin:.7rem 0 0">The idea discriminates perfectly — the sane curve is essentially free, the inflated one is not. It is the <em>magnitude</em> that is unusable.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>Why &lambda; = 200 destroyed the run</h3>
+    <p>The penalty is in squared box-overshoot units; the energy is a curvature integral. Nothing makes them commensurate, so &lambda; had to be calibrated, and it was not. For the sample above, <code>λ · Σexcess²</code> at λ = 200 is roughly <strong>a thousand times</strong> that sample's own energy. Even λ = 1 would make the penalty five times the energy. On samples like this one, <em>every</em> λ in the range I suggested earlier is still a hard constraint.</p>
+
+    <figure class="figwrap">
+      <div id="lamChart"></div>
+      <figcaption>The two measured configurations, 40 epochs each. Run 1 is the same fine-tune with no penalty; run 2 adds the box at λ = 200. Both bars are the <em>energy term only</em> — the box contribution is in the gradient but never logged — so the right-hand bar is the model failing to minimise curvature, not the penalty being counted.</figcaption>
+    </figure>
+
+    <div class="tool">
+      <div class="row">
+        <label for="lam">LAMBDA_BOX</label>
+        <div class="val" id="lamOut">200</div>
+        <input type="range" id="lam" min="0" max="300" step="1" value="200">
+      </div>
+      <div class="row">
+        <label for="exc">Batch-mean Σ excess²
+          <small class="sub">Never logged by the run. The inflated sample above measures 343.7 on its own; a batch mean sits lower, since most samples are not inflated.</small>
+        </label>
+        <div class="val" id="excOut">12.0</div>
+        <input type="range" id="exc" min="0" max="360" step="0.5" value="12">
+      </div>
+      <div class="bars">
+        <div class="bar"><div class="k">Energy term</div>
+          <div class="track"><div class="fill e" id="barE"></div><div class="num">254</div></div></div>
+        <div class="bar"><div class="k">λ × box term</div>
+          <div class="track"><div class="fill p" id="barP"></div><div class="num" id="barPNum">2,400</div></div></div>
+      </div>
+      <div class="verdict" id="verdict"></div>
+      <p class="sub" style="margin:12px 0 0">Energy reference 254 is what the same fine-tune reached in run 1 with no penalty. Both bars share one scale, capped at 600 for display.</p>
+    </div>
+
+    <p>The penalty is zero inside the box, so the only way it can stall the energy is by pressing the optimiser permanently against the constraint. At λ = 200 any knot configuration that pushes a control point even slightly out costs more than the entire energy gain available, so the model retreats to the interior and stays. The box stops being a regulariser and becomes a <em>hard</em> constraint — and because control points legitimately overshoot the data for interpolating splines, the feasible set it carves out excludes good curves, not only bad ones.</p>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Road fine-tune, 15 real GPS turns</th><th class="n">Win vs chordal</th><th class="n">Median ratio</th><th class="n">Road train κ</th></tr></thead>
+        <tbody>
+          <tr><td>Before fine-tune</td><td class="n">13.3%</td><td class="n">9.637</td><td class="n">—</td></tr>
+          <tr><td>Run 1 — no penalty</td><td class="n">26.7%</td><td class="n">1.661</td><td class="n">254</td></tr>
+          <tr class="hl"><td>Run 2 — buffer box, λ = 200</td><td class="n" style="color:var(--bad)">0.0%</td><td class="n">7.421</td><td class="n" style="color:var(--warn)">~592</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>What to change</h3>
+    <ol class="stack">
+      <li><strong>Make the excess dimensionless.</strong> Divide by <code>half</code> before squaring, so the penalty measures relative overshoot rather than overshoot in data units. Today a control point five box-widths out contributes its distance squared in raw coordinates, which is why one runaway point can dominate an entire batch.</li>
+      <li><strong>Use a Huber hinge, not a square.</strong> Quadratic growth on violations this large gives unbounded gradients from a single bad sample. A smooth-L1 beyond one box-width keeps the signal and bounds the pull.</li>
+      <li><strong>Normalise by <code>(N+2)·2</code></strong> so the penalty is a mean — removes the N-bias and makes λ transferable across lengths.</li>
+      <li><strong>Then calibrate λ against measurement</strong> rather than guessing, and ramp it from zero over the first few epochs so the model is not pinned to the box before it has learned anything.</li>
+      <li><strong>Log it.</strong> <code>train_one_epoch</code> already computes and returns <code>box_mean</code>; the fine-tune cell throws it away with <code>train_loss = out[0]</code>. Printing <code>energy_loss</code>, <code>box_loss</code> and <code>λ·box_loss</code> side by side would have diagnosed this on epoch 1 instead of after 49 minutes.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="band" id="localmin">
+  <div class="wide stack">
+    <p class="eyebrow">10 · Local minima</p>
+    <h2>Does one forward pass land on a minimum?</h2>
+    <p class="sub">Cell 45 compares the raw prediction against an L-BFGS refinement of it and against the best of 15 L-BFGS'd random restarts, on 100 held-out N = 6 samples.</p>
+
+    <figure class="figwrap">
+      <div id="lbfgsChart"></div>
+      <figcaption>The ten progress rows the run logged, on log axes. Below the diagonal the model beats chordal. Eight of ten below — and one catastrophe at 16× worse than baseline, which L-BFGS could not rescue because it <em>is</em> a local minimum, just a terrible one. The refined marker sits on top of the model marker for seven of these ten.</figcaption>
+    </figure>
+
+    <p><code>refined / model = 0.9620</code> across all 97 valid samples is a strong finding: a second-order optimiser handed the model's answer cannot improve it — for 81.4% of samples by under 5%, for the median sample by 0.0%. One forward pass lands <em>on</em> a local minimum, in about a millisecond. That is the amortised-optimisation claim, cleanly demonstrated.</p>
+    <p>The engineering that makes it credible is the reparameterisation: <code>theta ∈ ℝ^{K+1}</code> is unconstrained and every <code>theta</code> maps to a valid ordered knot vector, so L-BFGS's strong-Wolfe line search never collides with a projection step. The earlier Adam refiners sort, clamp and force a minimum gap after every step, which fights the optimiser and stalls it.</p>
+
+    <div class="callout flag">
+      <h3>With one caveat that section 08 adds</h3>
+      <p>The objective L-BFGS was descending is the <code>num_pts = 100</code> quadrature. On a spiky integrand that grid is aliased, so part of what the refiner was climbing out of — and part of what it concluded was flat — belongs to the grid rather than to the energy. “The model sits at a local minimum of the computed objective” is established. “Of the true bending energy” needs the same run at converged resolution.</p>
+    </div>
+
+    <h3>Three caveats the print statements obscure</h3>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>What it printed</th><th>Why it misleads</th></tr></thead>
+        <tbody>
+          <tr><td class="m">best/refined = 1.5150<br>“model found the BEST local minimum”</td><td>The thresholds are one-sided (<code>&gt; 0.95</code>, <code>&gt; 0.90</code>) and assume ratios below 1. Random restarts were <em>worse</em> than the model, so both strings fire spuriously. Do not copy them into the paper.</td></tr>
+          <tr><td class="m">Win: model 79.4% vs restarts 90.7%</td><td>Restarts win more often while having a <em>higher</em> median κ. They dodge the model's rare catastrophes but usually land in worse basins. <strong>Medians hide this entirely</strong> — p95 and the catastrophe rate matter more for anything deployed.</td></tr>
+          <tr><td class="m">GRADIENT ANALYSIS — nothing printed</td><td><code>valid_gn</code> was empty: all 97 per-sample <code>‖∇κ‖</code> computations threw or returned non-finite, silently, via <code>except Exception: grad_norms.append(nan)</code>. The most direct stationarity evidence is missing from the result.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>And <code>experiments/local_min_lbfgs/README.md</code> already flags that these numbers are <strong>not comparable</strong> to the top-level README's table (ratio 0.140, 96% win), which used Adam, a different sample set — median chordal 133.8 against 396.3 here — and a different restart budget. Pick one protocol before the paper reports either.</p>
+  </div>
+</section>
+
+<section class="band" id="bugs">
+  <div class="wide stack">
+    <p class="eyebrow">11 · Defects</p>
+    <h2>Four things to fix before anything is published</h2>
+
+    <div class="stack">
+      <div class="callout sev">
+        <h3>1 · The quadrature does not resolve the integrand</h3>
+        <p>Section 08 in full. <code>num_pts = 100</code> misstates absolute κ by 2–12× and the ratio by about 2× on a hard sample; <code>N_QUAD = 50</code> in training misstates the ratio by 15× and in the opposite direction for each curve. Sweep the stored evaluation sets at converged resolution before reporting any κ or any ratio.</p>
+      </div>
+
+      <div class="callout flag">
+        <h3>2 · The heatmap's local-minimum marker is plotted at the wrong point</h3>
+        <pre>best_k_this = init.copy()
+...
+    if k_eval &lt; best_kappa_this:
+        best_kappa_this = k_eval
+        <u>best_k</u> = knots.detach().numpy().copy()   <i># writes best_k</i>
+if best_kappa_this &lt; best_overall_kappa:
+    best_overall_kappa = best_kappa_this
+    best_overall_k     = <u>best_k_this</u>             <i># reads best_k_this</i></pre>
+        <p><code>best_k</code> is a dead store; <code>best_k_this</code> is never updated after initialisation. The function returns an improved κ paired with the <em>initial random knots</em>. Everything downstream inherits it: <code>k1_fixed</code> and <code>k4_fixed</code> define the slice the heatmap is computed on, so <code>curvature_landscape_v2.png</code> is a slice through an arbitrary point with a mismarked optimum. One-line fix: <code>best_k_this = knots.detach().numpy().copy()</code>.</p>
+      </div>
+
+      <div class="callout flag">
+        <h3>3 · The device global makes results depend on cell execution order</h3>
+        <p>Cell 42 sets <code>cl.device = DEVICE</code> (CUDA) then builds <strong>CPU</strong> tensors. <code>construct</code> allocates CUDA temporaries internally, they meet CPU inputs, a <code>RuntimeError</code> is raised, and <code>except Exception: break</code> swallows it on iteration zero. The stored output confirms it:</p>
+        <pre>Local min knots   : [0.0342271 0.04479033 0.96740919 0.98]  <i># identical to the model's</i>
+  curvature       : <u>inf</u></pre>
+        <p>So cell 42's local-minimum result is an artifact, not a finding. Cell 45's trace <em>does</em> show real improvements, which means it ran in a session where <code>cl.device</code> was CPU — <strong>the validity of that experiment depends on which cells you ran first.</strong></p>
+        <p>Root fix: derive the device from the inputs (<code>dev = knots.device</code>) throughout <code>construct</code>, <code>de_boor</code>, <code>solve_nd</code> and the derivative functions. That makes the solver device-agnostic and deletes both the cell-18 monkey-patch and this whole class of silent failure.</p>
+      </div>
+
+      <div class="callout flag">
+        <h3>4 · The box penalty can poison a whole batch</h3>
+        <pre>batch_box_sum.append(buffer_box_penalty(C, pts_g))   <u># BEFORE the finite check</u>
+finite = torch.isfinite(eng)
+eng_ok = eng[finite]                                  <i># energy drops bad samples</i></pre>
+        <p>The energy term carefully drops non-finite samples; the box term does not — it is computed on the whole group's <code>C</code> before any filtering. When <code>inv_ex</code> hits a near-singular <code>A</code>, <code>C</code> holds inf/NaN, the energy is correctly dropped, and the box penalty still enters the loss. Then <code>loss</code> is NaN, <code>backward()</code> gives NaN gradients, <code>clip_grad_norm_</code> does <em>not</em> remove them (it scales by a norm that is itself NaN), and <code>optim.step()</code> writes NaN into the weights.</p>
+        <p>It evidently did not fire in the stored run. But <code>nan_skips</code> is returned by <code>train_one_epoch</code> and discarded by the caller, so there is no evidence either way. Mask the box term by <code>finite</code> too, and guard with <code>if not torch.isfinite(loss): continue</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="col stack">
+    <p class="eyebrow">Summary</p>
+    <h2>Four sentences</h2>
+    <ol class="stack">
+      <li>Knots are the only free variable, and they are simultaneously the knot vector and the data parameterisation — “pacing” is the right intuition.</li>
+      <li>The entire chain is differentiable, the linear solve included, so the curve's own curvature is the training signal and no label exists anywhere in the system.</li>
+      <li>The buffer box is the right idea at the wrong weight and in the wrong units: the energy genuinely rewards inflation, the convex-hull property gives a differentiable handle on it, but raw squared overshoot at λ = 200 is a hard constraint whose feasible set excludes the good solutions.</li>
+      <li>Underneath all of it, the quadrature does not resolve the integrand it is integrating, so the absolute energies, the headline ratios and the training signal are all resolution-dependent — which is the first thing to fix, because every other number depends on it.</li>
+    </ol>
+    <p>In order: sweep the evaluation sets at converged quadrature, recover the pinned degree of freedom in the output head, make the solver device-agnostic, re-specify the box penalty in relative units with a Huber hinge, and run the trip-split notebook.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="band">
+  <div class="wide">
+    Read from <span style="font-family:var(--mono);font-size:12.5px">notebooks/Phase2_BufferBox.ipynb</span> (51 cells, stored outputs included) plus <span style="font-family:var(--mono);font-size:12.5px">knot_transformer.py</span>, <span style="font-family:var(--mono);font-size:12.5px">curvature_layer_nd.py</span>, <span style="font-family:var(--mono);font-size:12.5px">losses.py</span> and <span style="font-family:var(--mono);font-size:12.5px">generalization_experiment.py</span>. Training and evaluation results are the notebook's own stored outputs; nothing was re-run. The curves, combs, knot lines, κ profiles, convergence sweep and box penalties are computed on this page by a port of the repository's solver, validated against the notebook's energies.
+  </div>
+</footer>
+
+<script>
+/* ===================================================================
+   B-spline engine — port of curvature_layer_nd.py
+   =================================================================== */
+function fullKnots(uInt){ return [0,0,0,0].concat(uInt, [1,1,1,1]); }
+
+function basis(U, p, t){
+  var m = U.length, i, q;
+  var Nv = new Array(m-1);
+  for(i=0;i<m-1;i++) Nv[i] = (t >= U[i] && t < U[i+1]) ? 1 : 0;
+  for(q=1;q<=p;q++){
+    var next = new Array(m-1-q);
+    for(i=0;i<m-1-q;i++){
+      var a=0,b=0,d1=U[i+q]-U[i],d2=U[i+q+1]-U[i+1];
+      if(d1>0) a = (t-U[i])/d1 * Nv[i];
+      if(d2>0) b = (U[i+q+1]-t)/d2 * Nv[i+1];
+      next[i]=a+b;
+    }
+    Nv = next;
+  }
+  return Nv;
+}
+
+function buildA(uInt, n){
+  var U = fullKnots(uInt), size = n+2, i, j;
+  var A = [];
+  for(i=0;i<size;i++) A.push(new Array(size).fill(0));
+  var u1 = U[4], u2 = U[5];
+  A[0][0] = u2; A[0][1] = -(u1+u2); A[0][2] = u1;
+  for(i=0;i<n;i++){
+    var t = U[i+3], row = A[i+1];
+    if(t >= 1-1e-12){ row[n+1] = 1; }
+    else { var Nv = basis(U,3,t); for(j=0;j<size;j++) row[j] = Nv[j] || 0; }
+  }
+  var uK = U[n+1], uK1 = U[n];
+  A[size-1][size-3] = 1-uK;
+  A[size-1][size-2] = uK + uK1 - 2;
+  A[size-1][size-1] = 1-uK1;
+  return { A:A, U:U };
+}
+
+function solveLin(A, B){
+  var n = A.length, i, j, k, r, M = [];
+  for(i=0;i<n;i++) M.push(A[i].slice().concat(B[i].slice()));
+  for(k=0;k<n;k++){
+    var piv = k, best = Math.abs(M[k][k]);
+    for(r=k+1;r<n;r++){ if(Math.abs(M[r][k]) > best){ best = Math.abs(M[r][k]); piv = r; } }
+    if(best < 1e-14) return null;
+    if(piv !== k){ var tmp = M[k]; M[k] = M[piv]; M[piv] = tmp; }
+    for(r=k+1;r<n;r++){
+      var f = M[r][k]/M[k][k];
+      if(f === 0) continue;
+      for(j=k;j<n+2;j++) M[r][j] -= f*M[k][j];
+    }
+  }
+  var X = [];
+  for(i=0;i<n;i++) X.push([0,0]);
+  for(var c=0;c<2;c++){
+    for(i=n-1;i>=0;i--){
+      var s = M[i][n+c];
+      for(j=i+1;j<n;j++) s -= M[i][j]*X[j][c];
+      X[i][c] = s/M[i][i];
+    }
+  }
+  return X;
+}
+
+function derivCtrl(C, U){
+  var i, Q = [], nC = C.length;
+  for(i=0;i<nC-1;i++){
+    var d = U[i+4]-U[i+1], s = d>0 ? 3/d : 0;
+    Q.push([ s*(C[i+1][0]-C[i][0]), s*(C[i+1][1]-C[i][1]) ]);
+  }
+  var dU = U.slice(1,-1), R = [];
+  for(i=0;i<Q.length-1;i++){
+    var d2 = dU[i+3]-dU[i+1], s2 = d2>0 ? 2/d2 : 0;
+    R.push([ s2*(Q[i+1][0]-Q[i][0]), s2*(Q[i+1][1]-Q[i][1]) ]);
+  }
+  return { Q:Q, dU:dU, R:R, ddU:dU.slice(1,-1) };
+}
+
+function evalAt(C, U, dv, t){
+  var tc = Math.min(Math.max(t,0), 1-1e-9), i;
+  var N0 = basis(U,3,tc), N1 = basis(dv.dU,2,tc), N2 = basis(dv.ddU,1,tc);
+  var p=[0,0], d1=[0,0], d2=[0,0];
+  for(i=0;i<C.length;i++){ p[0]+=N0[i]*C[i][0]; p[1]+=N0[i]*C[i][1]; }
+  for(i=0;i<dv.Q.length;i++){ d1[0]+=N1[i]*dv.Q[i][0]; d1[1]+=N1[i]*dv.Q[i][1]; }
+  for(i=0;i<dv.R.length;i++){ d2[0]+=N2[i]*dv.R[i][0]; d2[1]+=N2[i]*dv.R[i][1]; }
+  return { p:p, d1:d1, d2:d2 };
+}
+
+function kappaAt(s){
+  var sp2 = s.d1[0]*s.d1[0] + s.d1[1]*s.d1[1] + 1e-12;
+  var cross = s.d1[0]*s.d2[1] - s.d1[1]*s.d2[0];
+  return { k: Math.abs(cross)/(sp2*Math.sqrt(sp2)),
+           sign: (cross<0?-1:1), speed: Math.sqrt(sp2) };
+}
+
+/* repo quadrature: h=1/(M-1), (h/3)(4*odd + 2*even) */
+function energyRepo(C,U,dv,M){
+  var S1=0,S2=0,h=1/(M-1);
+  for(var i=0;i<M;i++){
+    var kk = kappaAt(evalAt(C,U,dv,i/(M-1)));
+    var term = kk.k*kk.k*kk.speed;
+    if(i%2===1) S1+=term; else S2+=term;
+  }
+  return (h/3)*(4*S1+2*S2);
+}
+
+function buildCase(pts, uInt){
+  var n = pts.length, ab = buildA(uInt, n), U = ab.U, i;
+  var rhs = [[0,0]];
+  for(i=0;i<n;i++) rhs.push([pts[i][0], pts[i][1]]);
+  rhs.push([0,0]);
+  var C = solveLin(ab.A, rhs);
+  if(!C) return null;
+  var dv = derivCtrl(C, U);
+
+  var samples = [], M = 600;
+  for(i=0;i<M;i++){
+    var t = i/(M-1), s = evalAt(C,U,dv,t), kk = kappaAt(s);
+    samples.push({ t:t, p:s.p, d1:s.d1, k:kk.k, sign:kk.sign });
+  }
+  /* interpolation residual at the data parameters */
+  var res = 0;
+  for(i=0;i<n;i++){
+    var sp = evalAt(C,U,dv,U[i+3]);
+    res = Math.max(res, Math.hypot(sp.p[0]-pts[i][0], sp.p[1]-pts[i][1]));
+  }
+  var ks = samples.map(function(s){ return s.k; }).slice().sort(function(a,b){return a-b;});
+  return {
+    pts:pts, uInt:uInt, U:U, C:C, dv:dv, samples:samples, residual:res,
+    k90: ks[Math.floor(ks.length*0.90)] || 1,
+    kappa50:  energyRepo(C,U,dv,50),
+    kappa100: energyRepo(C,U,dv,100),
+    kappaConv: energyRepo(C,U,dv,3200)
+  };
+}
+
+function boxPenalty(cas, margin){
+  var pts = cas.pts, i, d;
+  var lo=[Infinity,Infinity], hi=[-Infinity,-Infinity];
+  for(i=0;i<pts.length;i++) for(d=0;d<2;d++){
+    if(pts[i][d]<lo[d]) lo[d]=pts[i][d];
+    if(pts[i][d]>hi[d]) hi[d]=pts[i][d];
+  }
+  var center=[0.5*(lo[0]+hi[0]), 0.5*(lo[1]+hi[1])];
+  var half=[0.5*(hi[0]-lo[0])*(1+margin), 0.5*(hi[1]-lo[1])*(1+margin)];
+  var total=0, outside=0, per=[];
+  for(i=0;i<cas.C.length;i++){
+    var ex=[0,0];
+    for(d=0;d<2;d++) ex[d]=Math.max(Math.abs(cas.C[i][d]-center[d])-half[d], 0);
+    var e2=ex[0]*ex[0]+ex[1]*ex[1];
+    total+=e2;
+    if(e2>0) outside++;
+    per.push({ ex:ex, e2:e2 });
+  }
+  return { lo:lo, hi:hi, center:center, half:half, total:total, outside:outside, per:per };
+}
+
+function extents(cas, which){
+  var b={x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity};
+  function add(p){
+    if(p[0]<b.x0)b.x0=p[0]; if(p[0]>b.x1)b.x1=p[0];
+    if(p[1]<b.y0)b.y0=p[1]; if(p[1]>b.y1)b.y1=p[1];
+  }
+  if(which==='curve') cas.samples.forEach(function(s){ add(s.p); });
+  if(which==='ctrl')  cas.C.forEach(add);
+  if(which==='pts')   cas.pts.forEach(add);
+  return b;
+}
+
+/* ===================================================================
+   Notebook data
+   =================================================================== */
+var SAMPLE_PTS = [
+  [ 0.1144607,  -0.02903495],
+  [-0.44626413,  0.13820953],
+  [-0.14740674,  0.21086831],
+  [ 0.31514286,  0.05016787],
+  [-0.05143829,  0.41838578],
+  [ 0.43318564,  0.45778141]
+];
+var CHORD_U = [0.24501364, 0.37379954, 0.57883911, 0.796404];
+var MODEL_U = [0.0342271,  0.04479033, 0.96740919, 0.98];
+var NB_KAPPA = { chordal: 711.51, model: 68.42 };
+
+var EXTRAP = [
+  { N:4, split:'trained',  win:0.724, winLo:0.722, winHi:0.726, ratio:0.2568, rLo:0.2516, rHi:0.2620 },
+  { N:5, split:'trained',  win:0.718, winLo:0.714, winHi:0.722, ratio:0.3476, rLo:0.3247, rHi:0.3704 },
+  { N:6, split:'held-out', win:0.696, winLo:0.692, winHi:0.700, ratio:0.2522, rLo:0.2494, rHi:0.2551 },
+  { N:7, split:'far',      win:0.673, winLo:0.664, winHi:0.682, ratio:0.3583, rLo:0.3250, rHi:0.3915 },
+  { N:8, split:'far',      win:0.718, winLo:0.710, winHi:0.726, ratio:0.2950, rLo:0.2878, rHi:0.3021 }
+];
+
+var LBFGS = [
+  { i:10,  chord:91.5,   model:12.0,   refined:12.0   },
+  { i:20,  chord:482.6,  model:978.7,  refined:723.0  },
+  { i:30,  chord:94.8,   model:35.0,   refined:35.0   },
+  { i:40,  chord:69.0,   model:22.4,   refined:22.2   },
+  { i:50,  chord:414.2,  model:15.5,   refined:15.5   },
+  { i:60,  chord:1195.8, model:81.5,   refined:81.5   },
+  { i:70,  chord:234.5,  model:3703.1, refined:3628.2 },
+  { i:80,  chord:35.8,   model:14.9,   refined:14.9   },
+  { i:90,  chord:442.9,  model:122.5,  refined:122.5  },
+  { i:100, chord:530.3,  model:10.4,   refined:10.4   }
+];
+
+var BUDGET = [
+  { name:'decoder ×3',      v:200256, c:'var(--accent)' },
+  { name:'encoder ×3',      v:149952, c:'var(--accent)', dim:true },
+  { name:'knot_head',       v:2113,   c:'var(--warn)' },
+  { name:'point_pos_embed', v:640,    c:'var(--warn)' },
+  { name:'input_proj',      v:448,    c:'var(--warn)' },
+  { name:'knot_queries',    v:384,    c:'var(--warn)' }
+];
+
+var CASES = [
+  { key:'chordal', name:'Chordal heuristic', u:CHORD_U, nb:NB_KAPPA.chordal },
+  { key:'model',   name:'Transformer',       u:MODEL_U, nb:NB_KAPPA.model }
+];
+CASES.forEach(function(c){
+  c.cas = buildCase(SAMPLE_PTS, c.u);
+  if(c.cas) c.box = boxPenalty(c.cas, 0.25);
+});
+
+/* ===================================================================
+   helpers
+   =================================================================== */
+function esc(n){ return Math.round(n*1000)/1000; }
+function svgOpen(w,h,label){ return '<svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+'">'; }
+function fmtInt(n){ return Math.round(n).toLocaleString('en-US'); }
+function fmtK(n){
+  if(n>=1000) return n.toFixed(0);
+  if(n>=100)  return n.toFixed(1);
+  if(n>=1)    return n.toFixed(2);
+  return n.toFixed(3);
+}
+
+/* ---------- verification readout ---------- */
+(function(){
+  var el = document.getElementById('verify');
+  if(!el) return;
+  var rows = CASES.map(function(c){
+    if(!c.cas) return '';
+    var diff = Math.abs(c.cas.kappa100 - c.nb);
+    return '<tr><td class="m">'+c.name+'</td>'+
+      '<td class="n">'+c.cas.kappa100.toFixed(4)+'</td>'+
+      '<td class="n">'+c.nb.toFixed(2)+'</td>'+
+      '<td class="n" style="color:'+(diff<0.02?'var(--accent)':'var(--bad)')+'">'+
+        (diff<0.02?'match':'Δ '+diff.toFixed(3))+'</td>'+
+      '<td class="n">'+c.cas.residual.toExponential(1)+'</td></tr>';
+  }).join('');
+  el.innerHTML = '<div class="scroll" style="margin:0"><table class="narrow">'+
+    '<thead><tr><th>Knots</th><th class="n">This page, num_pts 100</th><th class="n">Notebook</th>'+
+    '<th class="n">Agreement</th><th class="n">Interp. residual</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div>';
+})();
+
+/* ---------- parameter budget ---------- */
+(function(){
+  var el = document.getElementById('budgetChart');
+  if(!el) return;
+  var W=460, H=215, x0=118, x1=W-58, total=353793;
+  var s = svgOpen(W,H,'Parameter counts per submodule');
+  s += '<text x="0" y="11" class="ttl">Parameters by submodule</text>';
+  var y=30, bh=20, gap=10;
+  BUDGET.forEach(function(d){
+    var w = (d.v/total)*(x1-x0);
+    s += '<text x="'+(x0-8)+'" y="'+(y+14)+'" text-anchor="end" class="lbl">'+d.name+'</text>';
+    s += '<rect x="'+x0+'" y="'+y+'" width="'+Math.max(w,1.5)+'" height="'+bh+'" rx="2" fill="'+d.c+'" opacity="'+(d.dim?0.62:0.88)+'"/>';
+    s += '<text x="'+(x0+Math.max(w,1.5)+6)+'" y="'+(y+14)+'">'+fmtInt(d.v)+'</text>';
+    y += bh+gap;
+  });
+  s += '<line x1="'+x0+'" y1="'+(y-gap+4)+'" x2="'+x1+'" y2="'+(y-gap+4)+'" stroke="var(--rule)"/>';
+  s += '<text x="'+(x0-8)+'" y="'+(y+14)+'" text-anchor="end" class="lbl">total</text>';
+  s += '<text x="'+x0+'" y="'+(y+14)+'" class="acc">353,793  ·  six transformer layers = 99%</text>';
+  s += '</svg>';
+  el.innerHTML = s;
+})();
+
+/* ---------- collocation matrix ---------- */
+(function(){
+  var el = document.getElementById('matrixFig');
+  if(!el) return;
+  var cell=25, x0=58, y0=26, n=8;
+  var W=330, H=y0+n*cell+28;
+  var rows = [
+    { label:'C″(0)=0', cols:[0,1,2],   kind:'w' },
+    { label:'t=0',     cols:[0],       kind:'a' },
+    { label:'t=u₁',    cols:[0,1,2,3], kind:'a' },
+    { label:'t=u₂',    cols:[1,2,3,4], kind:'a' },
+    { label:'t=u₃',    cols:[2,3,4,5], kind:'a' },
+    { label:'t=u₄',    cols:[3,4,5,6], kind:'a' },
+    { label:'t=1',     cols:[7],       kind:'a' },
+    { label:'C″(1)=0', cols:[5,6,7],   kind:'w' }
+  ];
+  var s = svgOpen(W,H,'Structure of the 8 by 8 collocation matrix for N equals 6');
+  s += '<text x="0" y="11" class="ttl">A(u) for N = 6  →  8 × 8</text>';
+  rows.forEach(function(r,i){
+    r.cols.forEach(function(c){
+      var fill = r.kind==='w' ? 'var(--warn)' : 'var(--accent)';
+      s += '<rect x="'+(x0+c*cell+1)+'" y="'+(y0+i*cell+1)+'" width="'+(cell-1)+'" height="'+(cell-1)+'" fill="'+fill+'" opacity="0.82"/>';
+    });
+    s += '<text x="'+(x0-8)+'" y="'+(y0+i*cell+16)+'" text-anchor="end" class="'+(r.kind==='w'?'wrn':'lbl')+'">'+r.label+'</text>';
+  });
+  s += '<g fill="none" stroke="var(--rule)" stroke-width="1"><rect x="'+x0+'" y="'+y0+'" width="'+(n*cell)+'" height="'+(n*cell)+'"/>';
+  for(var g=1;g<n;g++){
+    s += '<line x1="'+(x0+g*cell)+'" y1="'+y0+'" x2="'+(x0+g*cell)+'" y2="'+(y0+n*cell)+'"/>';
+    s += '<line x1="'+x0+'" y1="'+(y0+g*cell)+'" x2="'+(x0+n*cell)+'" y2="'+(y0+g*cell)+'"/>';
+  }
+  s += '</g>';
+  s += '<text x="'+(x0+n*cell/2)+'" y="'+(H-8)+'" text-anchor="middle">control point index  0 … 7</text>';
+  s += '</svg>';
+  el.innerHTML = s;
+})();
+
+/* ---------- extrapolation chart ---------- */
+(function(){
+  var el = document.getElementById('extrapChart');
+  if(!el) return;
+  var W=520, H=250, pad={l:42,r:14,t:28,b:46}, mid=128;
+  var cw = (W-pad.l-pad.r)/EXTRAP.length;
+  function colour(sp){ return sp==='trained' ? 'var(--faint)' : 'var(--accent)'; }
+  var s = svgOpen(W,H,'Win rate and curvature ratio by sequence length');
+
+  var yA0=pad.t+74, yA1=pad.t+4, wLo=0.60, wHi=0.78;
+  function yw(v){ return yA0 - (v-wLo)/(wHi-wLo)*(yA0-yA1); }
+  s += '<text x="0" y="11" class="ttl">Win rate vs chordal</text>';
+  [0.60,0.70,0.78].forEach(function(g){
+    s += '<line x1="'+pad.l+'" y1="'+yw(g)+'" x2="'+(W-pad.r)+'" y2="'+yw(g)+'" stroke="var(--rule)" stroke-dasharray="2 3"/>';
+    s += '<text x="'+(pad.l-6)+'" y="'+(yw(g)+3)+'" text-anchor="end">'+(g*100).toFixed(0)+'%</text>';
+  });
+  EXTRAP.forEach(function(d,i){
+    var cx = pad.l + i*cw + cw/2, bw = Math.min(cw*0.46, 34);
+    s += '<rect x="'+(cx-bw/2)+'" y="'+yw(d.win)+'" width="'+bw+'" height="'+(yA0-yw(d.win))+'" rx="2" fill="'+colour(d.split)+'" opacity="0.85"/>';
+    s += '<line x1="'+cx+'" y1="'+yw(d.winLo)+'" x2="'+cx+'" y2="'+yw(d.winHi)+'" stroke="var(--ink)" stroke-width="1.2"/>';
+    s += '<line x1="'+(cx-4)+'" y1="'+yw(d.winHi)+'" x2="'+(cx+4)+'" y2="'+yw(d.winHi)+'" stroke="var(--ink)" stroke-width="1.2"/>';
+    s += '<line x1="'+(cx-4)+'" y1="'+yw(d.winLo)+'" x2="'+(cx+4)+'" y2="'+yw(d.winLo)+'" stroke="var(--ink)" stroke-width="1.2"/>';
+  });
+
+  var yB0=H-pad.b, yB1=mid+32, rLo=0.20, rHi=0.42;
+  function yr(v){ return yB0 - (v-rLo)/(rHi-rLo)*(yB0-yB1); }
+  s += '<text x="0" y="'+(mid+16)+'" class="ttl">Median κ ratio — model / chordal  (lower is better)</text>';
+  [0.20,0.30,0.42].forEach(function(g){
+    s += '<line x1="'+pad.l+'" y1="'+yr(g)+'" x2="'+(W-pad.r)+'" y2="'+yr(g)+'" stroke="var(--rule)" stroke-dasharray="2 3"/>';
+    s += '<text x="'+(pad.l-6)+'" y="'+(yr(g)+3)+'" text-anchor="end">'+g.toFixed(2)+'</text>';
+  });
+  var line='';
+  EXTRAP.forEach(function(d,i){
+    var cx = pad.l + i*cw + cw/2;
+    line += (i?' L':'M')+esc(cx)+' '+esc(yr(d.ratio));
+    s += '<line x1="'+cx+'" y1="'+yr(d.rLo)+'" x2="'+cx+'" y2="'+yr(d.rHi)+'" stroke="var(--warn)" stroke-width="1.2" opacity="0.6"/>';
+  });
+  s += '<path d="'+line+'" fill="none" stroke="var(--warn)" stroke-width="2"/>';
+  EXTRAP.forEach(function(d,i){
+    var cx = pad.l + i*cw + cw/2;
+    s += '<circle cx="'+cx+'" cy="'+yr(d.ratio)+'" r="4" fill="var(--warn)"/>';
+    s += '<text x="'+cx+'" y="'+(H-26)+'" text-anchor="middle" class="lbl">N='+d.N+'</text>';
+    s += '<text x="'+cx+'" y="'+(H-14)+'" text-anchor="middle">'+d.split+'</text>';
+  });
+  s += '</svg>';
+  el.innerHTML = s;
+})();
+
+/* ---------- curve viewer ---------- */
+function renderCase(c, opts){
+  var W=330, H=300, pad=24;
+  var b;
+  if(opts.zoom){
+    b = extents(c.cas,'pts');
+    var mx=(b.x1-b.x0)*0.35, my=(b.y1-b.y0)*0.35;
+    b={x0:b.x0-mx,y0:b.y0-my,x1:b.x1+mx,y1:b.y1+my};
+  } else {
+    b = extents(c.cas,'curve');
+    var e = extents(c.cas,'pts');
+    b.x0=Math.min(b.x0,e.x0); b.y0=Math.min(b.y0,e.y0);
+    b.x1=Math.max(b.x1,e.x1); b.y1=Math.max(b.y1,e.y1);
+    if(opts.box){
+      b.x0=Math.min(b.x0,c.box.center[0]-c.box.half[0]);
+      b.x1=Math.max(b.x1,c.box.center[0]+c.box.half[0]);
+      b.y0=Math.min(b.y0,c.box.center[1]-c.box.half[1]);
+      b.y1=Math.max(b.y1,c.box.center[1]+c.box.half[1]);
+    }
+    var px=(b.x1-b.x0)*0.06, py=(b.y1-b.y0)*0.06;
+    b={x0:b.x0-px,y0:b.y0-py,x1:b.x1+px,y1:b.y1+py};
+  }
+  var bw = Math.max(b.x1-b.x0,1e-6), bh = Math.max(b.y1-b.y0,1e-6);
+  var sc = Math.min((W-2*pad)/bw, (H-2*pad)/bh);
+  var ox = (W - bw*sc)/2 - b.x0*sc, oy = (H - bh*sc)/2 + b.y1*sc;
+  function PX(p){ return [ p[0]*sc + ox, oy - p[1]*sc ]; }
+
+  var clipId = 'clip-'+c.key+(opts.zoom?'-z':'');
+  var s = svgOpen(W,H,c.name+' spline through six waypoints');
+  s += '<defs><clipPath id="'+clipId+'"><rect x="0" y="0" width="'+W+'" height="'+H+'"/></clipPath></defs>';
+  s += '<g clip-path="url(#'+clipId+')">';
+
+  /* data bounding box, for scale reference */
+  var dbb = extents(c.cas,'pts');
+  var dtl = PX([dbb.x0, dbb.y1]);
+  s += '<rect x="'+esc(dtl[0])+'" y="'+esc(dtl[1])+'" width="'+esc((dbb.x1-dbb.x0)*sc)+'" height="'+esc((dbb.y1-dbb.y0)*sc)+'" fill="none" stroke="var(--faint)" stroke-width="1" stroke-dasharray="4 3"/>';
+
+  if(opts.box){
+    var btl = PX([c.box.center[0]-c.box.half[0], c.box.center[1]+c.box.half[1]]);
+    s += '<rect x="'+esc(btl[0])+'" y="'+esc(btl[1])+'" width="'+esc(2*c.box.half[0]*sc)+'" height="'+esc(2*c.box.half[1]*sc)+'" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="6 4"/>';
+  }
+
+  if(opts.comb){
+    var combLen = 0.15*Math.min(bw,bh)*sc, teeth='';
+    c.cas.samples.forEach(function(sm,i){
+      if(i%3) return;
+      var sp = Math.hypot(sm.d1[0], sm.d1[1]) || 1;
+      var nx = -sm.d1[1]/sp*sm.sign, ny = sm.d1[0]/sp*sm.sign;
+      var L = Math.min(sm.k/c.cas.k90, 1.6)*combLen;
+      var a = PX(sm.p);
+      teeth += 'M'+esc(a[0])+' '+esc(a[1])+'L'+esc(a[0]+nx*L)+' '+esc(a[1]-ny*L);
+    });
+    if(teeth) s += '<path d="'+teeth+'" stroke="var(--warn)" stroke-width="1" opacity="0.5" fill="none"/>';
+  }
+
+  if(opts.ctrl){
+    var poly = c.cas.C.map(function(p){ var q=PX(p); return esc(q[0])+','+esc(q[1]); }).join(' ');
+    s += '<polyline points="'+poly+'" fill="none" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" opacity="0.65"/>';
+    c.cas.C.forEach(function(p,i){
+      var q=PX(p), out = opts.box && c.box.per[i].e2>0;
+      s += '<circle cx="'+esc(q[0])+'" cy="'+esc(q[1])+'" r="'+(out?4:3)+'" fill="'+(out?'var(--bad)':'var(--muted)')+'"/>';
+    });
+  }
+
+  var d = c.cas.samples.map(function(sm,i){ var q=PX(sm.p); return (i?'L':'M')+esc(q[0])+' '+esc(q[1]); }).join('');
+  s += '<path d="'+d+'" fill="none" stroke="var(--ink)" stroke-width="2.1" stroke-linecap="round"/>';
+
+  c.cas.pts.forEach(function(p,i){
+    var q=PX(p);
+    s += '<circle cx="'+esc(q[0])+'" cy="'+esc(q[1])+'" r="4.4" fill="var(--accent)" stroke="var(--surface)" stroke-width="1.4"/>';
+    s += '<text x="'+esc(q[0]+7)+'" y="'+esc(q[1]-6)+'" class="acc">'+i+'</text>';
+  });
+  s += '</g>';
+  s += '<text x="'+(W-6)+'" y="'+(H-6)+'" text-anchor="end">frame '+bw.toFixed(2)+' × '+bh.toFixed(2)+' data units</text>';
+  s += '</svg>';
+  return s;
+}
+
+function drawViewer(){
+  var panels = document.getElementById('curvePanels');
+  if(!panels) return;
+  var opts = {
+    comb: document.getElementById('cComb').checked,
+    ctrl: document.getElementById('cCtrl').checked,
+    box:  document.getElementById('cBox').checked,
+    zoom: document.getElementById('cZoom').checked
+  };
+  var html = '';
+  CASES.forEach(function(c){
+    html += '<figure>';
+    html += '<div class="vhead"><span class="nm">'+c.name+'</span></div>';
+    if(!c.cas){ html += '<p class="sub">solver failed on this knot vector</p></figure>'; return; }
+    html += '<div class="vhead"><span class="kv">κ '+c.cas.kappa100.toFixed(2)+
+            ' <span style="opacity:.6">at num_pts 100</span> · '+c.cas.kappaConv.toFixed(2)+
+            ' <span style="opacity:.6">converged</span></span></div>';
+    html += renderCase(c, opts);
+    var ce = extents(c.cas,'ctrl');
+    html += '<figcaption><span style="font-family:var(--mono);font-size:11.5px">u = ['+
+            c.u.map(function(v){return v.toFixed(4);}).join(', ')+']</span><br>'+
+            'control points span x ['+ce.x0.toFixed(2)+', '+ce.x1.toFixed(2)+'], y ['+
+            ce.y0.toFixed(2)+', '+ce.y1.toFixed(2)+']'+
+            (opts.box ? ' · <b>'+c.box.outside+' of '+c.cas.C.length+'</b> outside the box, Σexcess² = '+c.box.total.toFixed(3) : '')+
+            '</figcaption>';
+    html += '</figure>';
+  });
+  panels.innerHTML = html;
+}
+['cComb','cCtrl','cBox','cZoom'].forEach(function(id){
+  var e = document.getElementById(id);
+  if(e) e.addEventListener('change', drawViewer);
+});
+drawViewer();
+
+/* ---------- kappa profile ---------- */
+(function(){
+  var el = document.getElementById('kappaProfile');
+  if(!el) return;
+  var W=520, H=250, pad={l:48,r:96,t:28,b:36};
+  var lo=Math.log10(0.01), hi=Math.log10(5000);
+  function X(t){ return pad.l + t*(W-pad.l-pad.r); }
+  function Y(k){ return (H-pad.b) - (Math.log10(Math.max(k,0.01))-lo)/(hi-lo)*(H-pad.b-pad.t); }
+  var s = svgOpen(W,H,'Curvature along the curve for both knot vectors, log scale');
+  s += '<text x="0" y="11" class="ttl">κ along the curve  ·  shared log scale</text>';
+  [0.01,0.1,1,10,100,1000].forEach(function(g){
+    s += '<line x1="'+pad.l+'" y1="'+esc(Y(g))+'" x2="'+(W-pad.r)+'" y2="'+esc(Y(g))+'" stroke="var(--rule)" stroke-dasharray="2 3"/>';
+    s += '<text x="'+(pad.l-6)+'" y="'+esc(Y(g)+3)+'" text-anchor="end">'+(g<1?g:fmtInt(g))+'</text>';
+  });
+  [0,0.25,0.5,0.75,1].forEach(function(t){
+    s += '<text x="'+esc(X(t))+'" y="'+(H-20)+'" text-anchor="middle">'+t+'</text>';
+  });
+  s += '<text x="'+esc(X(0.5))+'" y="'+(H-6)+'" text-anchor="middle" class="lbl">parameter t</text>';
+  CASES.forEach(function(c,ci){
+    if(!c.cas) return;
+    var col = ci===0 ? 'var(--accent)' : 'var(--warn)';
+    var d = c.cas.samples.map(function(sm,i){ return (i?'L':'M')+esc(X(sm.t))+' '+esc(Y(sm.k)); }).join('');
+    s += '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="1.7" opacity="0.9"/>';
+    s += '<circle cx="'+(W-86)+'" cy="'+(pad.t+2+ci*15)+'" r="4" fill="'+col+'"/>';
+    s += '<text x="'+(W-78)+'" y="'+(pad.t+5+ci*15)+'">'+c.name+'</text>';
+  });
+  s += '<line x1="'+pad.l+'" y1="'+(H-pad.b)+'" x2="'+(W-pad.r)+'" y2="'+(H-pad.b)+'" stroke="var(--rule)"/>';
+  s += '</svg>';
+  el.innerHTML = s;
+})();
+
+/* ---------- knot number lines ---------- */
+(function(){
+  var el = document.getElementById('knotLines');
+  if(!el) return;
+  var W=520, rowH=54, H=rowH*2+34, x0=104, x1=W-28;
+  function X(u){ return x0 + u*(x1-x0); }
+  var s = svgOpen(W,H,'Knot positions on the unit interval for both parameterisations');
+  s += '<text x="0" y="11" class="ttl">Interior knot placement on [0, 1]</text>';
+  CASES.forEach(function(c,r){
+    var y = 34 + r*rowH;
+    s += '<text x="'+(x0-10)+'" y="'+(y+4)+'" text-anchor="end" class="lbl">'+c.name+'</text>';
+    s += '<line x1="'+x0+'" y1="'+y+'" x2="'+x1+'" y2="'+y+'" stroke="var(--rule)" stroke-width="2"/>';
+    s += '<line x1="'+x0+'" y1="'+(y-6)+'" x2="'+x0+'" y2="'+(y+6)+'" stroke="var(--faint)"/>';
+    s += '<line x1="'+x1+'" y1="'+(y-6)+'" x2="'+x1+'" y2="'+(y+6)+'" stroke="var(--faint)"/>';
+    var col = c.key==='model' ? 'var(--warn)' : 'var(--accent)';
+    c.u.forEach(function(u,i){
+      s += '<line x1="'+esc(X(u))+'" y1="'+(y-9)+'" x2="'+esc(X(u))+'" y2="'+(y+9)+'" stroke="'+col+'" stroke-width="2"/>';
+      s += '<circle cx="'+esc(X(u))+'" cy="'+y+'" r="3.2" fill="'+col+'"/>';
+      var dy = (i%2 && c.key==='model') ? 32 : 22;
+      s += '<text x="'+esc(X(u))+'" y="'+(y+dy)+'" text-anchor="middle" fill="'+col+'">'+u.toFixed(3)+'</text>';
+    });
+    for(var i=1;i<c.u.length;i++){
+      var gap = c.u[i]-c.u[i-1];
+      if(gap < 0.05){
+        s += '<text x="'+esc(X((c.u[i]+c.u[i-1])/2))+'" y="'+(y-14)+'" text-anchor="middle" class="wrn">gap '+gap.toFixed(3)+'</text>';
+      }
+    }
+  });
+  s += '<text x="'+x0+'" y="'+(H-4)+'">0</text><text x="'+x1+'" y="'+(H-4)+'" text-anchor="end">1</text>';
+  s += '</svg>';
+  el.innerHTML = s;
+})();
+
+/* ---------- extent readout ---------- */
+(function(){
+  var el = document.getElementById('extentReadout');
+  if(!el) return;
+  var dbb = extents(CASES[0].cas,'pts');
+  var dw = dbb.x1-dbb.x0, dh = dbb.y1-dbb.y0;
+  var rows = CASES.map(function(c){
+    var ce = extents(c.cas,'curve');
+    var w = ce.x1-ce.x0, h = ce.y1-ce.y0;
+    var f = Math.max(w/dw, h/dh);
+    return '<tr><td class="m">'+c.name+'</td><td class="n">'+w.toFixed(2)+' × '+h.toFixed(2)+
+           '</td><td class="n" style="color:'+(f>2?'var(--bad)':'var(--accent)')+'">'+f.toFixed(1)+'×</td></tr>';
+  }).join('');
+  el.innerHTML = '<div class="scroll" style="margin:0"><table class="narrow">'+
+    '<thead><tr><th>Knots</th><th class="n">Curve extent</th><th class="n">vs data box</th></tr></thead>'+
+    '<tbody>'+rows+'<tr class="sum"><td>data bounding box</td><td class="n">'+
+    dw.toFixed(2)+' × '+dh.toFixed(2)+'</td><td class="n">1.0×</td></tr></tbody></table></div>';
+})();
+
+/* ---------- quadrature convergence ---------- */
+var CONV_MS = [50,100,200,400,800,1600,3200];
+var CONV = CASES.map(function(c){
+  return { key:c.key, name:c.name,
+           vals: CONV_MS.map(function(M){ return energyRepo(c.cas.C, c.cas.U, c.cas.dv, M); }),
+           conv: c.cas.kappaConv };
+});
+
+(function(){
+  var el = document.getElementById('convChart');
+  if(!el) return;
+  var W=520, H=270, pad={l:52,r:104,t:28,b:44};
+  var lo=Math.log10(8), hi=Math.log10(8000);
+  function X(M){ return pad.l + (Math.log10(M)-lo)/(hi-lo)*(W-pad.l-pad.r); }
+  function Y(v){ return (H-pad.b) - (Math.log10(Math.max(v,5))-Math.log10(5))/(Math.log10(8000)-Math.log10(5))*(H-pad.b-pad.t); }
+  var s = svgOpen(W,H,'Computed energy against quadrature resolution');
+  s += '<text x="0" y="11" class="ttl">Computed κ vs quadrature resolution  ·  both axes log</text>';
+  [10,100,1000,5000].forEach(function(v){
+    s += '<line x1="'+pad.l+'" y1="'+esc(Y(v))+'" x2="'+(W-pad.r)+'" y2="'+esc(Y(v))+'" stroke="var(--rule)" stroke-dasharray="2 3"/>';
+    s += '<text x="'+(pad.l-6)+'" y="'+esc(Y(v)+3)+'" text-anchor="end">'+fmtInt(v)+'</text>';
+  });
+  CONV_MS.forEach(function(M){
+    s += '<text x="'+esc(X(M))+'" y="'+(H-26)+'" text-anchor="middle">'+M+'</text>';
+  });
+  s += '<text x="'+esc(X(300))+'" y="'+(H-8)+'" text-anchor="middle" class="lbl">num_pts</text>';
+  /* used-by markers */
+  [[50,'training'],[100,'eval']].forEach(function(m){
+    s += '<line x1="'+esc(X(m[0]))+'" y1="'+pad.t+'" x2="'+esc(X(m[0]))+'" y2="'+(H-pad.b)+'" stroke="var(--bad)" stroke-width="1" stroke-dasharray="3 2" opacity="0.75"/>';
+    s += '<text x="'+esc(X(m[0])+3)+'" y="'+(pad.t+9)+'" class="bad">'+m[1]+'</text>';
+  });
+  CONV.forEach(function(d,di){
+    var col = di===0 ? 'var(--accent)' : 'var(--warn)';
+    s += '<line x1="'+pad.l+'" y1="'+esc(Y(d.conv))+'" x2="'+(W-pad.r)+'" y2="'+esc(Y(d.conv))+'" stroke="'+col+'" stroke-dasharray="5 4" opacity="0.55"/>';
+    var path = d.vals.map(function(v,i){ return (i?'L':'M')+esc(X(CONV_MS[i]))+' '+esc(Y(v)); }).join('');
+    s += '<path d="'+path+'" fill="none" stroke="'+col+'" stroke-width="2"/>';
+    d.vals.forEach(function(v,i){
+      s += '<circle cx="'+esc(X(CONV_MS[i]))+'" cy="'+esc(Y(v))+'" r="3.4" fill="'+col+'"/>';
+    });
+    s += '<circle cx="'+(W-94)+'" cy="'+(pad.t+2+di*26)+'" r="4" fill="'+col+'"/>';
+    s += '<text x="'+(W-86)+'" y="'+(pad.t+5+di*26)+'">'+d.name+'</text>';
+    s += '<text x="'+(W-86)+'" y="'+(pad.t+16+di*26)+'">→ '+d.conv.toFixed(1)+'</text>';
+  });
+  s += '<line x1="'+pad.l+'" y1="'+(H-pad.b)+'" x2="'+(W-pad.r)+'" y2="'+(H-pad.b)+'" stroke="var(--rule)"/>';
+  s += '</svg>';
+  el.innerHTML = s;
+})();
+
+(function(){
+  var tb = document.getElementById('convRows');
+  if(!tb) return;
+  var ch = CONV[0], mo = CONV[1];
+  var html = CONV_MS.map(function(M,i){
+    var used = M===50 ? 'N_QUAD, training' : (M===100 ? 'every eval path' : '');
+    return '<tr'+(used?' class="hl"':'')+'><td class="n">'+M+'</td>'+
+      '<td class="n">'+fmtK(ch.vals[i])+'</td>'+
+      '<td class="n">'+fmtK(mo.vals[i])+'</td>'+
+      '<td class="n">'+(mo.vals[i]/ch.vals[i]).toFixed(4)+'</td>'+
+      '<td>'+used+'</td></tr>';
+  }).join('');
+  html += '<tr class="sum"><td class="n">converged</td><td class="n">'+fmtK(ch.conv)+
+          '</td><td class="n">'+fmtK(mo.conv)+'</td><td class="n">'+
+          (mo.conv/ch.conv).toFixed(4)+'</td><td>the actual integral</td></tr>';
+  tb.innerHTML = html;
+})();
+
+/* ---------- lambda measured chart ---------- */
+(function(){
+  var el = document.getElementById('lamChart');
+  if(!el) return;
+  var W=470, H=185, x0=74, y0=H-44, y1=26, vmax=700;
+  function Y(v){ return y0 - v/vmax*(y0-y1); }
+  var s = svgOpen(W,H,'Energy reached with and without the buffer box penalty');
+  s += '<text x="0" y="11" class="ttl">Road-fine-tune energy reached  (κ, energy term only)</text>';
+  [0,254,592].forEach(function(g){
+    s += '<line x1="'+x0+'" y1="'+esc(Y(g))+'" x2="'+(W-20)+'" y2="'+esc(Y(g))+'" stroke="var(--rule)" stroke-dasharray="2 3"/>';
+    s += '<text x="'+(x0-8)+'" y="'+esc(Y(g)+3)+'" text-anchor="end">'+g+'</text>';
+  });
+  var bars = [
+    { lbl:'λ = 0',   sub:'run 1 · no penalty', v:254, c:'var(--accent)' },
+    { lbl:'λ = 200', sub:'run 2 · buffer box', v:592, c:'var(--warn)'  }
+  ];
+  bars.forEach(function(b,i){
+    var cx = x0 + 90 + i*160, bw = 74;
+    s += '<rect x="'+(cx-bw/2)+'" y="'+esc(Y(b.v))+'" width="'+bw+'" height="'+esc(y0-Y(b.v))+'" rx="3" fill="'+b.c+'" opacity="0.88"/>';
+    s += '<text x="'+cx+'" y="'+esc(Y(b.v)-7)+'" text-anchor="middle" class="lbl">'+b.v+'</text>';
+    s += '<text x="'+cx+'" y="'+(y0+15)+'" text-anchor="middle" class="lbl">'+b.lbl+'</text>';
+    s += '<text x="'+cx+'" y="'+(y0+27)+'" text-anchor="middle">'+b.sub+'</text>';
+  });
+  var ax = x0+90+45, bx = x0+250-45;
+  s += '<line x1="'+ax+'" y1="'+(y1+6)+'" x2="'+bx+'" y2="'+(y1+6)+'" stroke="var(--faint)" stroke-dasharray="3 3"/>';
+  s += '<text x="'+((ax+bx)/2)+'" y="'+(y1+1)+'" text-anchor="middle">no λ measured between</text>';
+  s += '<text x="'+(x0+250+52)+'" y="'+esc(Y(592))+'" class="wrn">2.3× worse</text>';
+  s += '<line x1="'+x0+'" y1="'+y0+'" x2="'+(W-20)+'" y2="'+y0+'" stroke="var(--rule)"/>';
+  s += '</svg>';
+  el.innerHTML = s;
+})();
+
+/* ---------- L-BFGS scatter ---------- */
+(function(){
+  var el = document.getElementById('lbfgsChart');
+  if(!el) return;
+  var W=520, H=330, pad={l:52,r:100,t:28,b:48};
+  var lo=Math.log10(8), hi=Math.log10(5000);
+  function X(v){ return pad.l + (Math.log10(v)-lo)/(hi-lo)*(W-pad.l-pad.r); }
+  function Y(v){ return (H-pad.b) - (Math.log10(v)-lo)/(hi-lo)*(H-pad.b-pad.t); }
+  var s = svgOpen(W,H,'Model curvature against chordal curvature for the ten logged samples');
+  s += '<text x="0" y="11" class="ttl">Model κ vs chordal κ — the ten logged rows</text>';
+  [10,100,1000].forEach(function(t){
+    s += '<line x1="'+esc(X(t))+'" y1="'+pad.t+'" x2="'+esc(X(t))+'" y2="'+(H-pad.b)+'" stroke="var(--rule)" stroke-dasharray="2 3"/>';
+    s += '<line x1="'+pad.l+'" y1="'+esc(Y(t))+'" x2="'+(W-pad.r)+'" y2="'+esc(Y(t))+'" stroke="var(--rule)" stroke-dasharray="2 3"/>';
+    s += '<text x="'+esc(X(t))+'" y="'+(H-pad.b+14)+'" text-anchor="middle">'+t+'</text>';
+    s += '<text x="'+(pad.l-7)+'" y="'+esc(Y(t)+3)+'" text-anchor="end">'+t+'</text>';
+  });
+  s += '<line x1="'+esc(X(8))+'" y1="'+esc(Y(8))+'" x2="'+esc(X(5000))+'" y2="'+esc(Y(5000))+'" stroke="var(--faint)" stroke-width="1.5"/>';
+  s += '<text x="'+esc(X(1500)+4)+'" y="'+esc(Y(1500)-6)+'">parity with chordal</text>';
+  s += '<text x="'+esc(X(11))+'" y="'+esc(Y(1200))+'" class="acc">model wins below the line</text>';
+  LBFGS.forEach(function(d){
+    if(Math.abs(d.refined-d.model)/d.model > 0.01){
+      s += '<line x1="'+esc(X(d.chord))+'" y1="'+esc(Y(d.model))+'" x2="'+esc(X(d.chord))+'" y2="'+esc(Y(d.refined))+'" stroke="var(--accent)" stroke-width="3" opacity="0.4"/>';
+    }
+  });
+  LBFGS.forEach(function(d){
+    var win = d.model < d.chord;
+    s += '<circle cx="'+esc(X(d.chord))+'" cy="'+esc(Y(d.model))+'" r="5.5" fill="'+(win?'var(--accent)':'var(--bad)')+'" opacity="0.9"/>';
+    if(!win){
+      s += '<text x="'+esc(X(d.chord)+10)+'" y="'+esc(Y(d.model)-4)+'" class="bad">sample '+d.i+'</text>';
+      s += '<text x="'+esc(X(d.chord)+10)+'" y="'+esc(Y(d.model)+7)+'">κ '+d.model.toFixed(0)+' vs '+d.chord.toFixed(0)+'</text>';
+    }
+  });
+  s += '<text x="'+esc((pad.l+W-pad.r)/2)+'" y="'+(H-8)+'" text-anchor="middle" class="lbl">chordal κ  (log)</text>';
+  var my = (pad.t+H-pad.b)/2;
+  s += '<text x="14" y="'+my+'" text-anchor="middle" class="lbl" transform="rotate(-90 14 '+my+')">model κ  (log)</text>';
+  s += '<circle cx="'+(W-88)+'" cy="'+(pad.t+8)+'" r="5" fill="var(--accent)"/><text x="'+(W-78)+'" y="'+(pad.t+11)+'">beats chordal</text>';
+  s += '<circle cx="'+(W-88)+'" cy="'+(pad.t+24)+'" r="5" fill="var(--bad)"/><text x="'+(W-78)+'" y="'+(pad.t+27)+'">loses</text>';
+  s += '<line x1="'+(W-93)+'" y1="'+(pad.t+40)+'" x2="'+(W-83)+'" y2="'+(pad.t+40)+'" stroke="var(--accent)" stroke-width="3" opacity="0.4"/><text x="'+(W-78)+'" y="'+(pad.t+43)+'">L-BFGS moved it</text>';
+  s += '</svg>';
+  el.innerHTML = s;
+})();
+
+/* ---------- box readout ---------- */
+(function(){
+  var el = document.getElementById('boxReadout');
+  if(!el) return;
+  var rows = CASES.filter(function(c){ return c.cas && c.box; }).map(function(c){
+    var vsE = 200*c.box.total / c.cas.kappa100;
+    return '<tr><td class="m">'+c.name+'</td><td class="n">'+c.box.outside+' / '+c.cas.C.length+
+           '</td><td class="n">'+c.box.total.toFixed(3)+'</td><td class="n">'+fmtInt(200*c.box.total)+
+           '</td><td class="n" style="color:'+(vsE>1?'var(--bad)':'var(--accent)')+'">'+
+           (vsE<0.01 ? '<0.01×' : vsE.toFixed(vsE>10?0:2)+'×')+'</td></tr>';
+  }).join('');
+  el.innerHTML = '<div class="scroll" style="margin:0"><table class="narrow">'+
+    '<thead><tr><th>Knots</th><th class="n">Outside</th><th class="n">Σ excess²</th>'+
+    '<th class="n">× λ=200</th><th class="n">vs own κ</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div>';
+})();
+
+/* ---------- lambda slider ---------- */
+(function(){
+  var lam=document.getElementById('lam'), exc=document.getElementById('exc');
+  if(!lam||!exc) return;
+  var lamOut=document.getElementById('lamOut'), excOut=document.getElementById('excOut');
+  var barE=document.getElementById('barE'), barP=document.getElementById('barP');
+  var barPNum=document.getElementById('barPNum'), verdict=document.getElementById('verdict');
+  var ENERGY=254, SCALE=600;
+  function render(){
+    var L=Number(lam.value), X=Number(exc.value), penalty=L*X;
+    lamOut.textContent=fmtInt(L);
+    excOut.textContent=X.toFixed(1);
+    barE.style.width=Math.min(100,(ENERGY/SCALE)*100)+'%';
+    barP.style.width=Math.min(100,(penalty/SCALE)*100)+'%';
+    barPNum.textContent=fmtInt(penalty);
+    var ratio=penalty/ENERGY, cls, msg;
+    if(penalty===0){
+      cls='ok';
+      msg='<b>Penalty inert.</b> Either λ is zero or every control point is inside the box. This is the hinge doing its job — curves that were already contained are not biased at all.';
+    } else if(ratio<0.25){
+      cls='ok';
+      msg='<b>Regulariser.</b> The box costs '+(ratio*100).toFixed(0)+'% of the energy term. It can steer the model off the inflation strategy without taking over the objective. This is the regime the run should have been in.';
+    } else if(ratio<1){
+      cls='';
+      msg='<b>Co-objective.</b> At '+(ratio*100).toFixed(0)+'% of the energy term the box is a comparable goal rather than a correction. Workable, but expect the achievable curvature to rise.';
+    } else if(ratio<20){
+      cls='bad';
+      msg='<b>Hard constraint.</b> The box is '+ratio.toFixed(1)+'× the energy term. The optimiser will sit against the box boundary instead of minimising bending. This is roughly where run 2 lived: energy stalled at ~592 against 254 without the penalty, and the real-turn win rate went to 0.0%.';
+    } else {
+      cls='sev';
+      msg='<b>Energy is noise.</b> The box is '+fmtInt(ratio)+'× the energy term — curvature has no influence on the gradient at all. Note that a single inflated sample measures Σexcess² = 343.7 on its own, so a batch containing a few of them reaches this regime at λ = 200.';
+    }
+    verdict.className='verdict '+cls;
+    verdict.innerHTML=msg;
+  }
+  lam.addEventListener('input',render);
+  exc.addEventListener('input',render);
+  render();
+})();
+</script>
+
+</body>
+</html>

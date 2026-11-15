@@ -1,0 +1,2731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KnotTransformer Internals</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+
+<style>
+/* ──────────────────────────────────────────────────────────────────────
+   shadcn/ui design system, implemented directly.
+   Token names, HSL values, radius scale and component recipes follow
+   shadcn's zinc base; a purpose-built data palette sits on top for the
+   charts, since shadcn's chart-1..5 are not semantic for this content.
+   Layout: docs shell — sticky bar, left nav rail, content column.
+   ────────────────────────────────────────────────────────────────── */
+:root{
+  --background:0 0% 100%;
+  --foreground:240 10% 3.9%;
+  --card:0 0% 100%;
+  --card-foreground:240 10% 3.9%;
+  --popover:0 0% 100%;
+  --popover-foreground:240 10% 3.9%;
+  --primary:240 5.9% 10%;
+  --primary-foreground:0 0% 98%;
+  --secondary:240 4.8% 95.9%;
+  --secondary-foreground:240 5.9% 10%;
+  --muted:240 4.8% 95.9%;
+  --muted-foreground:240 3.8% 46.1%;
+  --accent:240 4.8% 95.9%;
+  --accent-foreground:240 5.9% 10%;
+  --destructive:0 72% 45%;
+  --destructive-foreground:0 0% 98%;
+  --border:240 5.9% 90%;
+  --input:240 5.9% 90%;
+  --ring:240 10% 3.9%;
+  --radius:0.5rem;
+
+  /* data palette */
+  --d-chordal:187 72% 30%;
+  --d-model:28 82% 42%;
+  --d-good:160 60% 34%;
+  --d-warn:35 92% 42%;
+  --d-bad:0 72% 45%;
+  --d-grid:240 5.9% 88%;
+  --d-ink:240 10% 20%;
+
+  --font-sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --background:240 10% 3.9%;
+    --foreground:0 0% 98%;
+    --card:240 10% 5.5%;
+    --card-foreground:0 0% 98%;
+    --popover:240 10% 5.5%;
+    --popover-foreground:0 0% 98%;
+    --primary:0 0% 98%;
+    --primary-foreground:240 5.9% 10%;
+    --secondary:240 3.7% 15.9%;
+    --secondary-foreground:0 0% 98%;
+    --muted:240 3.7% 15.9%;
+    --muted-foreground:240 5% 64.9%;
+    --accent:240 3.7% 15.9%;
+    --accent-foreground:0 0% 98%;
+    --destructive:0 70% 58%;
+    --destructive-foreground:0 0% 98%;
+    --border:240 3.7% 17%;
+    --input:240 3.7% 17%;
+    --ring:240 4.9% 83.9%;
+
+    --d-chordal:184 68% 52%;
+    --d-model:32 92% 60%;
+    --d-good:158 62% 50%;
+    --d-warn:40 94% 58%;
+    --d-bad:0 72% 64%;
+    --d-grid:240 3.7% 20%;
+    --d-ink:0 0% 92%;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --background:240 10% 3.9%;
+  --foreground:0 0% 98%;
+  --card:240 10% 5.5%;
+  --card-foreground:0 0% 98%;
+  --popover:240 10% 5.5%;
+  --popover-foreground:0 0% 98%;
+  --primary:0 0% 98%;
+  --primary-foreground:240 5.9% 10%;
+  --secondary:240 3.7% 15.9%;
+  --secondary-foreground:0 0% 98%;
+  --muted:240 3.7% 15.9%;
+  --muted-foreground:240 5% 64.9%;
+  --accent:240 3.7% 15.9%;
+  --accent-foreground:0 0% 98%;
+  --destructive:0 70% 58%;
+  --destructive-foreground:0 0% 98%;
+  --border:240 3.7% 17%;
+  --input:240 3.7% 17%;
+  --ring:240 4.9% 83.9%;
+  --d-chordal:184 68% 52%;
+  --d-model:32 92% 60%;
+  --d-good:158 62% 50%;
+  --d-warn:40 94% 58%;
+  --d-bad:0 72% 64%;
+  --d-grid:240 3.7% 20%;
+  --d-ink:0 0% 92%;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+body{
+  margin:0;
+  background:hsl(var(--background));
+  color:hsl(var(--foreground));
+  font-family:var(--font-sans);
+  font-size:15px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+  -webkit-text-size-adjust:100%;
+}
+body::before{
+  content:"";position:fixed;inset:0 0 auto;
+  height:env(safe-area-inset-top,0px);z-index:60;
+  background:hsl(var(--background));
+}
+::selection{background:hsl(var(--primary)/.16)}
+
+/* ── typography ─────────────────────────────────────────────────── */
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.018em;text-wrap:balance}
+h1{font-size:clamp(28px,5.2vw,38px);line-height:1.12;font-weight:700}
+h2{font-size:clamp(20px,3.2vw,25px);line-height:1.2}
+h3{font-size:16px;line-height:1.35}
+h4{font-size:14px;line-height:1.4}
+p{margin:0}
+a{color:inherit}
+.prose{display:flex;flex-direction:column;gap:.85rem;max-width:72ch}
+.prose p{color:hsl(var(--foreground)/.84)}
+.lead{font-size:17px;color:hsl(var(--muted-foreground));max-width:72ch}
+.muted{color:hsl(var(--muted-foreground))}
+.tiny{font-size:12.5px;line-height:1.55;color:hsl(var(--muted-foreground))}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.eyebrow{
+  font-family:var(--font-mono);font-size:11px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;color:hsl(var(--muted-foreground));
+}
+strong{font-weight:600}
+code:not(pre code){
+  font-family:var(--font-mono);font-size:.855em;
+  background:hsl(var(--muted));padding:.14em .38em;
+  border-radius:calc(var(--radius) - 4px);word-break:break-word;
+}
+ol,ul{margin:0;padding-left:1.25rem;display:flex;flex-direction:column;gap:.5rem}
+li{color:hsl(var(--foreground)/.84)}
+
+/* ── shell ──────────────────────────────────────────────────────── */
+.gut{
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.topbar{
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:50;
+  background:hsl(var(--background)/.88);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid hsl(var(--border));
+}
+.topbar-in{
+  max-width:1360px;margin:0 auto;height:54px;
+  display:flex;align-items:center;gap:14px;
+}
+.brand{display:flex;align-items:center;gap:9px;min-width:0;font-weight:600;font-size:14.5px}
+.brand .glyph{
+  width:24px;height:24px;flex:0 0 auto;border-radius:7px;
+  background:hsl(var(--primary));color:hsl(var(--primary-foreground));
+  display:grid;place-items:center;
+}
+.brand .glyph svg{width:14px;height:14px}
+.topbar .spacer{flex:1 1 auto}
+
+.shell{max-width:1360px;margin:0 auto;display:grid;grid-template-columns:232px minmax(0,1fr);gap:0}
+.rail{
+  position:sticky;top:calc(54px + env(safe-area-inset-top,0px));
+  align-self:start;height:calc(100vh - 54px);
+  overflow-y:auto;padding:22px 18px 40px 0;
+}
+.rail-group+.rail-group{margin-top:18px}
+.rail-title{
+  font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:hsl(var(--muted-foreground));padding:0 10px 6px;
+}
+.rail a{
+  display:block;padding:5px 10px;border-radius:calc(var(--radius) - 2px);
+  font-size:13.5px;text-decoration:none;color:hsl(var(--muted-foreground));
+  border-left:2px solid transparent;
+}
+.rail a:hover{color:hsl(var(--foreground));background:hsl(var(--accent))}
+.rail a.on{color:hsl(var(--foreground));font-weight:500;background:hsl(var(--accent))}
+.content{padding:26px 0 72px;min-width:0}
+.mobilenav{display:none}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .rail{display:none}
+  .mobilenav{
+    display:block;position:sticky;top:calc(54px + env(safe-area-inset-top,0px));z-index:40;
+    background:hsl(var(--background)/.92);backdrop-filter:blur(10px);
+    border-bottom:1px solid hsl(var(--border));
+  }
+  .mobilenav .strip{
+    display:flex;gap:6px;overflow-x:auto;padding:8px 0;
+    max-width:1360px;margin:0 auto;scrollbar-width:none;
+  }
+  .mobilenav .strip::-webkit-scrollbar{display:none}
+  .mobilenav a{
+    flex:0 0 auto;font-size:12.5px;text-decoration:none;white-space:nowrap;
+    padding:4px 10px;border-radius:999px;border:1px solid hsl(var(--border));
+    color:hsl(var(--muted-foreground));
+  }
+  .mobilenav a.on{background:hsl(var(--secondary));color:hsl(var(--foreground))}
+}
+
+/* ── sections ───────────────────────────────────────────────────── */
+section{padding-block:34px;scroll-margin-top:110px}
+section+section{border-top:1px solid hsl(var(--border))}
+.sechead{display:flex;flex-direction:column;gap:.45rem;margin-bottom:1.15rem}
+.stack{display:flex;flex-direction:column;gap:1rem}
+.stack-sm{display:flex;flex-direction:column;gap:.6rem}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:.75rem}
+.grid2>*,.grid3>*{min-width:0}
+.span-all{grid-column:1/-1}
+
+/* ── card ───────────────────────────────────────────────────────── */
+.card{
+  border:1px solid hsl(var(--border));border-radius:var(--radius);
+  background:hsl(var(--card));color:hsl(var(--card-foreground));
+  box-shadow:0 1px 2px 0 hsl(var(--foreground)/.04);
+}
+.card-header{padding:16px 18px 0;display:flex;flex-direction:column;gap:.3rem}
+.card-header.tight{padding-bottom:0}
+.card-title{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
+.card-desc{font-size:12.5px;color:hsl(var(--muted-foreground));line-height:1.55}
+.card-body{padding:16px 18px}
+.card-body.pad-t-sm{padding-top:12px}
+.card-footer{
+  padding:11px 18px;border-top:1px solid hsl(var(--border));
+  font-size:12.5px;color:hsl(var(--muted-foreground));line-height:1.55;
+  background:hsl(var(--muted)/.35);
+  border-radius:0 0 var(--radius) var(--radius);
+}
+
+/* ── stat card ──────────────────────────────────────────────────── */
+.stat{padding:14px 16px}
+.stat .k{font-size:11.5px;font-weight:500;color:hsl(var(--muted-foreground));letter-spacing:.01em}
+.stat .v{
+  font-family:var(--font-mono);font-size:24px;font-weight:600;
+  letter-spacing:-.02em;margin-top:3px;font-variant-numeric:tabular-nums;
+}
+.stat .s{font-size:11.5px;color:hsl(var(--muted-foreground));margin-top:2px}
+
+/* ── badge ──────────────────────────────────────────────────────── */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;border-radius:999px;
+  border:1px solid transparent;padding:1px 9px;
+  font-size:11.5px;font-weight:600;line-height:1.5;white-space:nowrap;
+  font-family:var(--font-mono);letter-spacing:.01em;
+}
+.badge-default{background:hsl(var(--primary));color:hsl(var(--primary-foreground))}
+.badge-secondary{background:hsl(var(--secondary));color:hsl(var(--secondary-foreground))}
+.badge-outline{border-color:hsl(var(--border));color:hsl(var(--muted-foreground))}
+.badge-destructive{background:hsl(var(--destructive));color:hsl(var(--destructive-foreground))}
+.badge-good{background:hsl(var(--d-good)/.14);color:hsl(var(--d-good));border-color:hsl(var(--d-good)/.3)}
+.badge-warn{background:hsl(var(--d-warn)/.16);color:hsl(var(--d-warn));border-color:hsl(var(--d-warn)/.34)}
+.badge-chordal{background:hsl(var(--d-chordal)/.14);color:hsl(var(--d-chordal));border-color:hsl(var(--d-chordal)/.3)}
+.badge-model{background:hsl(var(--d-model)/.14);color:hsl(var(--d-model));border-color:hsl(var(--d-model)/.3)}
+
+/* ── button ─────────────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  border-radius:calc(var(--radius) - 2px);border:1px solid transparent;
+  font-family:var(--font-sans);font-size:13px;font-weight:500;
+  height:32px;padding:0 12px;cursor:pointer;white-space:nowrap;
+  transition:background-color .14s,color .14s,border-color .14s;
+}
+.btn:focus-visible{outline:2px solid hsl(var(--ring));outline-offset:2px}
+.btn-default{background:hsl(var(--primary));color:hsl(var(--primary-foreground))}
+.btn-default:hover{background:hsl(var(--primary)/.88)}
+.btn-outline{border-color:hsl(var(--border));background:hsl(var(--background));color:hsl(var(--foreground))}
+.btn-outline:hover{background:hsl(var(--accent))}
+.btn-secondary{background:hsl(var(--secondary));color:hsl(var(--secondary-foreground))}
+.btn-secondary:hover{background:hsl(var(--secondary)/.75)}
+.btn-ghost{background:transparent;color:hsl(var(--muted-foreground))}
+.btn-ghost:hover{background:hsl(var(--accent));color:hsl(var(--foreground))}
+.btn-sm{height:28px;padding:0 10px;font-size:12px}
+.btn[disabled]{opacity:.5;pointer-events:none}
+.btn.on{background:hsl(var(--secondary));color:hsl(var(--foreground));border-color:hsl(var(--border))}
+
+/* ── tabs ───────────────────────────────────────────────────────── */
+.tabs-list{
+  display:inline-flex;align-items:center;gap:2px;height:34px;padding:3px;
+  background:hsl(var(--muted));border-radius:calc(var(--radius) + 1px);
+  max-width:100%;overflow-x:auto;scrollbar-width:none;
+}
+.tabs-list::-webkit-scrollbar{display:none}
+.tabs-trigger{
+  flex:0 0 auto;border:0;background:transparent;cursor:pointer;
+  font-family:var(--font-sans);font-size:12.5px;font-weight:500;
+  color:hsl(var(--muted-foreground));padding:0 11px;height:28px;
+  border-radius:calc(var(--radius) - 2px);white-space:nowrap;
+}
+.tabs-trigger[aria-selected="true"]{
+  background:hsl(var(--background));color:hsl(var(--foreground));
+  box-shadow:0 1px 2px hsl(var(--foreground)/.08);
+}
+.tabs-panel{margin-top:14px}
+
+/* ── table ──────────────────────────────────────────────────────── */
+.tablewrap{width:100%;overflow-x:auto;border-radius:calc(var(--radius) - 2px)}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:460px}
+table.wide{min-width:620px}
+thead th{
+  text-align:left;font-weight:500;font-size:11.5px;letter-spacing:.04em;
+  text-transform:uppercase;color:hsl(var(--muted-foreground));
+  padding:8px 12px;border-bottom:1px solid hsl(var(--border));
+  white-space:nowrap;background:hsl(var(--muted)/.5);
+}
+tbody td{padding:8px 12px;border-bottom:1px solid hsl(var(--border)/.7);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:hsl(var(--muted)/.4)}
+td.num,th.num{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+td.mn{font-family:var(--font-mono);font-size:12px}
+tr.flag td{background:hsl(var(--d-warn)/.1)}
+tr.flag:hover td{background:hsl(var(--d-warn)/.16)}
+tr.total td{background:hsl(var(--muted)/.8);font-weight:600}
+
+/* ── alert ──────────────────────────────────────────────────────── */
+.alert{
+  border:1px solid hsl(var(--border));border-radius:var(--radius);
+  padding:14px 16px;display:grid;grid-template-columns:18px 1fr;gap:0 11px;
+  background:hsl(var(--card));
+}
+.alert .ico{width:16px;height:16px;margin-top:3px}
+.alert .at{font-weight:600;font-size:13.5px;margin-bottom:3px}
+.alert .ad{font-size:13px;color:hsl(var(--foreground)/.82);display:flex;flex-direction:column;gap:.55rem}
+.alert-info{border-color:hsl(var(--d-chordal)/.4);background:hsl(var(--d-chordal)/.07)}
+.alert-info .ico,.alert-info .at{color:hsl(var(--d-chordal))}
+.alert-warn{border-color:hsl(var(--d-warn)/.45);background:hsl(var(--d-warn)/.08)}
+.alert-warn .ico,.alert-warn .at{color:hsl(var(--d-warn))}
+.alert-bad{border-color:hsl(var(--d-bad)/.45);background:hsl(var(--d-bad)/.07)}
+.alert-bad .ico,.alert-bad .at{color:hsl(var(--d-bad))}
+
+/* ── separator ──────────────────────────────────────────────────── */
+.sep{height:1px;background:hsl(var(--border));border:0;margin:0}
+
+/* ── code block ─────────────────────────────────────────────────── */
+pre{
+  margin:0;font-family:var(--font-mono);font-size:12px;line-height:1.62;
+  background:hsl(var(--muted)/.55);border:1px solid hsl(var(--border));
+  border-radius:calc(var(--radius) - 2px);padding:12px 14px;overflow-x:auto;
+}
+pre b{color:hsl(var(--d-chordal));font-weight:600}
+pre i{color:hsl(var(--muted-foreground));font-style:normal}
+pre u{color:hsl(var(--d-warn));text-decoration:none;font-weight:600}
+pre s{color:hsl(var(--d-bad));text-decoration:none;font-weight:600}
+
+/* ── switch ─────────────────────────────────────────────────────── */
+.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:12.5px;color:hsl(var(--foreground)/.85)}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch .trk{
+  width:34px;height:19px;flex:0 0 auto;border-radius:999px;
+  background:hsl(var(--input));position:relative;transition:background-color .16s;
+}
+.switch .trk::after{
+  content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;
+  border-radius:999px;background:hsl(var(--background));
+  box-shadow:0 1px 2px hsl(var(--foreground)/.2);transition:transform .16s;
+}
+.switch input:checked+.trk{background:hsl(var(--primary))}
+.switch input:checked+.trk::after{transform:translateX(15px)}
+.switch input:focus-visible+.trk{outline:2px solid hsl(var(--ring));outline-offset:2px}
+
+/* ── slider ─────────────────────────────────────────────────────── */
+.sl{display:grid;gap:4px}
+.sl-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.sl-lab{font-family:var(--font-mono);font-size:11.5px;color:hsl(var(--muted-foreground))}
+.sl-val{font-family:var(--font-mono);font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+input[type=range]{
+  -webkit-appearance:none;appearance:none;width:100%;height:18px;
+  background:transparent;margin:0;cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:hsl(var(--secondary))}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:15px;height:15px;margin-top:-4.5px;
+  border-radius:999px;background:hsl(var(--background));
+  border:2px solid hsl(var(--primary));box-shadow:0 1px 2px hsl(var(--foreground)/.18);
+}
+input[type=range]::-moz-range-track{height:6px;border-radius:999px;background:hsl(var(--secondary))}
+input[type=range]::-moz-range-thumb{
+  width:13px;height:13px;border-radius:999px;background:hsl(var(--background));
+  border:2px solid hsl(var(--primary));
+}
+input[type=range]:focus-visible::-webkit-slider-thumb{outline:2px solid hsl(var(--ring));outline-offset:2px}
+
+/* ── progress ───────────────────────────────────────────────────── */
+.prog{height:6px;border-radius:999px;background:hsl(var(--secondary));overflow:hidden}
+.prog>span{display:block;height:100%;background:hsl(var(--primary));width:0;transition:width .1s linear}
+
+/* ── accordion ──────────────────────────────────────────────────── */
+.acc-item{border-bottom:1px solid hsl(var(--border))}
+.acc-trig{
+  width:100%;background:transparent;border:0;cursor:pointer;
+  display:flex;align-items:center;gap:10px;text-align:left;
+  padding:14px 2px;font-family:var(--font-sans);font-size:14px;font-weight:500;
+  color:hsl(var(--foreground));
+}
+.acc-trig:hover{text-decoration:underline;text-underline-offset:3px}
+.acc-trig .chev{margin-left:auto;flex:0 0 auto;transition:transform .18s;color:hsl(var(--muted-foreground))}
+.acc-trig[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.acc-panel{padding:0 2px 16px;display:flex;flex-direction:column;gap:.7rem;font-size:13.5px}
+.acc-panel p{color:hsl(var(--foreground)/.84)}
+
+/* ── figures ────────────────────────────────────────────────────── */
+figure{margin:0}
+.chart{display:block;width:100%;height:auto;max-width:100%;overflow:visible}
+.chart text{font-family:var(--font-mono);font-size:9.5px;fill:hsl(var(--muted-foreground))}
+.chart text.ink{fill:hsl(var(--foreground))}
+.chart text.b{font-weight:600}
+.cvs{display:block;width:100%;height:auto;border-radius:calc(var(--radius) - 3px);border:1px solid hsl(var(--border))}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:hsl(var(--muted-foreground));font-family:var(--font-mono)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:14px;height:0;border-top:2px solid;display:inline-block}
+.legend i.dash{border-top-style:dashed}
+.legend i.dot{width:8px;height:8px;border-radius:999px;border:0}
+
+/* ── kv list ────────────────────────────────────────────────────── */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;font-size:12.5px}
+.kv dt{font-family:var(--font-mono);color:hsl(var(--muted-foreground))}
+.kv dd{margin:0;font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:right}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:560px){
+  body{font-size:14.5px}
+  .lead{font-size:16px}
+  .stat .v{font-size:21px}
+}
+
+/* standalone-only: supplied by the artifact host when published */
+[hidden]{display:none!important}
+img{max-width:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+
+<div class="topbar gut">
+  <div class="topbar-in">
+    <div class="brand">
+      <span class="glyph" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+          <path d="M3 18C6 18 7 6 12 6s6 12 9 12"/>
+        </svg>
+      </span>
+      <span>KnotTransformer<span class="muted" style="font-weight:400"> / internals</span></span>
+    </div>
+    <span class="spacer"></span>
+    <span class="badge badge-outline" style="display:none" id="themeBadge"></span>
+    <span class="badge badge-good" title="The solver on this page reproduces the notebook's energies">solver validated</span>
+  </div>
+</div>
+
+<div class="mobilenav gut"><div class="strip" id="mstrip"></div></div>
+
+<div class="shell gut">
+  <nav class="rail" id="rail" aria-label="Sections"></nav>
+  <main class="content" id="content">
+
+<section id="top">
+  <div class="stack">
+    <div class="sechead">
+      <div class="row">
+        <span class="badge badge-secondary">Phase 2 · Buffer Box</span>
+        <span class="badge badge-outline">51 cells read</span>
+        <span class="badge badge-outline">seed 20260527</span>
+      </div>
+      <h1>The engine under the knots</h1>
+      <p class="lead">An encoder–decoder transformer predicts the four numbers that set a B-spline's internal pacing. A differentiable solver turns those numbers into a curvature score, and that score is the only training signal. This page takes the whole chain apart — and recomputes it, so you can move the knots yourself.</p>
+    </div>
+
+    <div class="grid3">
+      <div class="card stat">
+        <div class="k">Parameters</div>
+        <div class="v">353,793</div>
+        <div class="s">99% generic transformer</div>
+      </div>
+      <div class="card stat">
+        <div class="k">Win rate, held-out N=6</div>
+        <div class="v">69.6%</div>
+        <div class="s">vs chordal, 500 samples</div>
+      </div>
+      <div class="card stat">
+        <div class="k">Free knots</div>
+        <div class="v" id="statDof">3 of 4</div>
+        <div class="s">output head pins the last</div>
+      </div>
+      <div class="card stat">
+        <div class="k">Defects found</div>
+        <div class="v" style="color:hsl(var(--d-bad))">4</div>
+        <div class="s">one invalidates every κ</div>
+      </div>
+    </div>
+
+    <div class="alert alert-info">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+      <div>
+        <div class="at">The fact everything else hangs off</div>
+        <div class="ad">
+          <p>In <code>construct_A</code> the collocation rows are evaluated at <code>t = knots[3 … N+2]</code>, which for a clamped vector is exactly <code>[0, u₁ … u_K, 1]</code>. The interior knots are <em>simultaneously</em> the knot vector and the parameter values assigned to the data points.</p>
+          <p>So when the model emits <code>u₂ = 0.7</code> it is saying “data point 2 sits at t = 0.7 along the curve.” That is what pacing means, and it is the only quantity in the system that is free. For N points there are N+6 knots, N+2 control points and <strong>K = N−2</strong> degrees of freedom. The control points are not free — they fall out of <code>A(u)·P = D̃</code>. Interpolation is free for any valid knot vector; only the shape changes.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Everything below is computed, not quoted</div>
+        <div class="card-desc">This page carries a JavaScript port of <code>curvature_layer_nd.py</code> — Cox–de Boor basis, the collocation matrix with its natural end rows, the linear solve, the derivative recursions, the quadrature. It runs on the sample points stored in the notebook.</div>
+      </div>
+      <div class="card-body pad-t-sm">
+        <div class="tablewrap"><table id="verifyTable"></table></div>
+      </div>
+      <div class="card-footer">Matching the notebook to five significant figures means the end-condition rows, the half-open-interval case at <code>t = 1</code> and both derivative recursions are reproduced correctly. Having an independent implementation is what let the quadrature defect surface at all.</div>
+    </div>
+  </div>
+</section>
+
+<section id="classes">
+  <div class="sechead">
+    <p class="eyebrow">01 · Inventory</p>
+    <h2>Every class in the repository</h2>
+    <p class="lead">Eleven classes across five files. Note what is <em>not</em> here: the solver has none at all.</p>
+  </div>
+
+  <div class="stack">
+    <div>
+      <div class="tabs-list" role="tablist" data-tabs="cls">
+        <button class="tabs-trigger" role="tab" aria-selected="true" data-panel="cls-2d">2-D model</button>
+        <button class="tabs-trigger" role="tab" aria-selected="false" data-panel="cls-nd">n-D &amp; 3-D</button>
+        <button class="tabs-trigger" role="tab" aria-selected="false" data-panel="cls-interp">Interpretability</button>
+        <button class="tabs-trigger" role="tab" aria-selected="false" data-panel="cls-fn">Solver functions</button>
+      </div>
+
+      <div class="tabs-panel" id="cls-2d">
+        <div class="card"><div class="card-body" style="padding:0">
+          <div class="tablewrap"><table class="wide">
+            <thead><tr><th>Class</th><th>Defined at</th><th>Base</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td class="mn"><strong>KnotTransformer</strong></td><td class="mn">knot_transformer.py:167</td><td class="mn">nn.Module</td><td>The 2-D model. <span class="badge badge-good">used here</span></td></tr>
+              <tr><td class="mn"><strong>BSplineDataset</strong></td><td class="mn">knot_transformer.py:95</td><td class="mn">Dataset</td><td>Mixed-N samples as <code>{points, heuristic, num_knots}</code>. <span class="badge badge-good">used</span></td></tr>
+              <tr><td class="mn">Phase1Trainer</td><td class="mn">knot_transformer.py:324</td><td class="mn">—</td><td>L1 loss against chordal knots. Produces <code>phase1_generalization.pt</code>.</td></tr>
+              <tr><td class="mn">Phase2Trainer</td><td class="mn">knot_transformer.py:418</td><td class="mn">—</td><td>Reference energy fine-tuner, one sample at a time. <span class="badge badge-warn">bypassed</span> — the notebook writes its own <code>train_one_epoch</code> for N-grouped batching.</td></tr>
+            </tbody>
+          </table></div>
+        </div></div>
+      </div>
+
+      <div class="tabs-panel" id="cls-nd" hidden>
+        <div class="card"><div class="card-body" style="padding:0">
+          <div class="tablewrap"><table class="wide">
+            <thead><tr><th>Class</th><th>Defined at</th><th>Base</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td class="mn">KnotTransformerND</td><td class="mn">knot_transformer_nd.py:183</td><td class="mn">nn.Module</td><td>Same architecture, <code>input_proj = Linear(spatial_dim + 4, d_model)</code>.</td></tr>
+              <tr><td class="mn">BSplineDatasetND</td><td class="mn">knot_transformer_nd.py:108</td><td class="mn">Dataset</td><td>n-D sample store, paired with <code>collate_nd</code>.</td></tr>
+              <tr><td class="mn">Phase1TrainerND</td><td class="mn">knot_transformer_nd.py:339</td><td class="mn">—</td><td>n-D pretraining.</td></tr>
+              <tr><td class="mn">Phase2TrainerND</td><td class="mn">knot_transformer_nd.py:404</td><td class="mn">—</td><td>n-D energy fine-tuning.</td></tr>
+              <tr><td class="mn">KnotTransformer3D</td><td class="mn">knot_transformer_3d.py:34</td><td class="mn">nn.Module</td><td>3-D variant. Queries are a raw <code>nn.Parameter</code>, not an <code>nn.Embedding</code> — hence <code>warm_start_from</code> to bridge the 2-D checkpoint.</td></tr>
+            </tbody>
+          </table></div>
+        </div></div>
+      </div>
+
+      <div class="tabs-panel" id="cls-interp" hidden>
+        <div class="card"><div class="card-body" style="padding:0">
+          <div class="tablewrap"><table class="wide">
+            <thead><tr><th>Class</th><th>Defined at</th><th>Base</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td class="mn">AttentionCapture</td><td class="mn">interpretability.py:81</td><td class="mn">nn.Module</td><td>Wrapper that hooks an attention layer and records its weight matrix.</td></tr>
+              <tr><td class="mn">LocalAttentionMask</td><td class="mn">interpretability.py:322</td><td class="mn">—</td><td>Banded mask generator for the attention-ablation study.</td></tr>
+            </tbody>
+          </table></div>
+        </div></div>
+      </div>
+
+      <div class="tabs-panel" id="cls-fn" hidden>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">The engine is deliberately not object-oriented</div>
+            <div class="card-desc"><code>curvature_layer_nd.py</code> and <code>bspline3d.py</code> define <strong>zero classes</strong>. Every piece of B-spline maths is a free function over tensors.</div>
+          </div>
+          <div class="card-body pad-t-sm">
+            <pre><b>construct</b>              <i>Cox–de Boor basis values at a parameter t</i>
+<b>construct_A</b>            <i>(N+2)×(N+2) collocation + natural end rows</i>
+<b>solve_nd</b>               <i>C = inv_ex(A) · D̃</i>
+<b>de_boor</b>                <i>batched curve / derivative evaluation</i>
+<b>first_derivative_nd</b>    <i>Qᵢ = 3(Cᵢ₊₁−Cᵢ)/Δu</i>
+<b>second_derivative_nd</b>   <i>Rᵢ = 2(Qᵢ₊₁−Qᵢ)/Δu</i>
+<b>local_curvature_nd</b>     <i>κ at one t, any dimension</i>
+<b>global_curvature_nd</b>    <i>∫ κ²·speed dt</i>
+<b>arc_nd</b>  <b>chordal_nd</b>  <b>centripetal_nd</b>  <b>dup</b>
+<i>2-D aliases:</i> <b>solve</b>  <b>global_curvature</b>  <b>arc</b></pre>
+          </div>
+          <div class="card-footer">That split is the right one. The model carries state and gets subclassed three ways; the solver is a pure function from <code>(points, knots)</code> to a scalar, so it needs no identity — which is exactly what lets autograd treat it as one differentiable block.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-warn">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg>
+      <div>
+        <div class="at">One mutable global, two separate failure modes</div>
+        <div class="ad"><p>The only state the engine carries is a module-level <code>device</code> at <code>curvature_layer_nd.py:28</code>, with <code>.to(device)</code> on every internal temporary. Hand it tensors from the wrong device and it raises, which callers swallow. That single global is behind defects 3 and the cell-18 monkey-patch.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="params">
+  <div class="sechead">
+    <p class="eyebrow">02 · Weights</p>
+    <h2>Where the 353,793 parameters live</h2>
+    <p class="lead"><code>d_model = 64</code>, <code>nhead = 4</code>, <code>dim_feedforward = 256</code>, three encoder and three decoder layers. The total reconciles exactly against the figure the notebook prints, which confirms there is no final <code>LayerNorm</code>.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Parameters by submodule</div></div>
+      <div class="card-body pad-t-sm"><div id="budgetChart"></div></div>
+      <div class="card-footer">Six generic transformer layers are 99% of the model. Everything problem-specific — the feature projection, the positional table, the six knot queries, the monotone head — is <strong>3,585</strong> parameters.</div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">One encoder layer — 49,984</div></div>
+        <div class="card-body pad-t-sm">
+          <pre>self_attn.in_proj_weight  <b>12,288</b>  <i>192×64</i>
+self_attn.in_proj_bias       <b>192</b>
+self_attn.out_proj         <b>4,160</b>  <i>64×64+64</i>
+linear1                   <b>16,640</b>  <i>256×64+256</i>
+linear2                   <b>16,448</b>  <i>64×256+64</i>
+norm1 + norm2                <b>256</b></pre>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">One decoder layer — 66,752</div></div>
+        <div class="card-body pad-t-sm">
+          <pre>self_attn                 <b>16,640</b>  <i>queries↔queries</i>
+multihead_attn            <b>16,640</b>  <i>queries↔memory</i>
+linear1                   <b>16,640</b>
+linear2                   <b>16,448</b>
+norm1 + norm2 + norm3        <b>384</b></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="dataflow">
+  <div class="sechead">
+    <p class="eyebrow">03 · Dataflow</p>
+    <h2>Six points in, four knots out</h2>
+    <p class="lead">Every tensor shape below is the real one, and the feature matrix is computed from the actual sample — these are the numbers <code>compute_geometric_features</code> hands the encoder.</p>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Shape flow</div><div class="card-desc">Blocks are drawn to scale in the channel dimension.</div></div>
+      <div class="card-body pad-t-sm"><div id="flowChart"></div></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">The six input channels, for this sample</div>
+          <div class="card-desc">Raw coordinates plus four hand-built scalars. Three of them are the classical baselines; one is the signal the baselines throw away.</div>
+        </div>
+        <div class="card-body pad-t-sm"><div id="featMatrix"></div></div>
+        <div class="card-footer" id="featFoot">Shading is per-column, min to max.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">What each channel encodes</div></div>
+        <div class="card-body pad-t-sm" style="padding:0">
+          <div class="tablewrap"><table>
+            <thead><tr><th>Channel</th><th>Computation</th><th>Encodes</th></tr></thead>
+            <tbody>
+              <tr><td class="mn">x, y</td><td class="mn">raw</td><td>Position in the normalised box</td></tr>
+              <tr><td class="mn">chord_cum</td><td class="mn">cumsum(‖Δp‖)/total</td><td>The chordal heuristic itself</td></tr>
+              <tr><td class="mn">local_frac</td><td class="mn">‖Δpᵢ‖/total</td><td>This segment's share of the arc</td></tr>
+              <tr><td class="mn">angles</td><td class="mn">atan2(cross,dot)→[0,1]</td><td><strong>Turning angle.</strong> The one thing chordal and centripetal both ignore. Endpoints get 0.</td></tr>
+              <tr><td class="mn">centri_cum</td><td class="mn">cumsum(√‖Δp‖)/total</td><td>The centripetal heuristic</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="attention">
+  <div class="sechead">
+    <p class="eyebrow">04 · Attention</p>
+    <h2>What the two attention stacks do here</h2>
+    <p class="lead">No trained weights ship with the repo, so there are no attention values to show. The structure is the interesting part anyway — it is what the baselines structurally cannot do.</p>
+  </div>
+
+  <div class="stack">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">The projection algebra</div></div>
+        <div class="card-body pad-t-sm">
+          <pre>Q = H·W_Q   K = H·W_K   V = H·W_V   <i>one 192×64 in_proj, split in 3</i>
+scores  = Q·Kᵗ / √d_k               <i>d_k = 64/4 heads = <b>16</b></i>
+weights = softmax(scores)            <i>masked at padded positions</i>
+out     = weights·V → out_proj      <i>64×64 back to d_model</i></pre>
+        </div>
+        <div class="card-footer">Four heads on 16-dimensional slices, so each head can specialise — one on arc position, another on local turning. <code>interpretability.py</code> exists to probe which.</div>
+      </div>
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">Attention shapes</div><div class="card-desc">Encoder self-attention is N×N; decoder cross-attention stays 6×N for every N.</div></div>
+        <div class="card-body pad-t-sm"><div id="attnShapes"></div></div>
+      </div>
+    </div>
+
+    <div class="prose">
+      <p><strong>Encoder self-attention, N×N.</strong> Each point attends to every other. Chordal spacing is <em>local</em> — one chord length at a time — so knot placement near point 2 cannot react to a tight bend at point 5. Self-attention makes exactly that dependence representable.</p>
+      <p><strong>Decoder cross-attention, 6×N.</strong> Six learned query vectors, one per knot slot, each cross-attending to the point memory and emitting one knot. Parallel, DETR-style, not autoregressive. The decoder also self-attends among the six queries, which is how slot 3 coordinates with slot 2 rather than duplicating it.</p>
+    </div>
+
+    <div class="alert alert-info">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+      <div>
+        <div class="at">This is the length-generalisation mechanism</div>
+        <div class="ad"><p>The encoder absorbs any N ≤ 10 through attention plus a padding mask. The decoder slot count is fixed at <code>max_knots = 6</code> and you read the first K. Training on N ∈ {4, 5} exercises <strong>slots 0–2 only</strong>. At N = 8 (K = 6) slots 3, 4 and 5 fire for the first time in their existence — and the result is <code>degenerate: 0</code>, 500/500 valid, best ratio of the five lengths.</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Length extrapolation</div>
+        <div class="card-desc">Cell 35, 500 fresh samples per N. Range bars span the available seeds.</div>
+      </div>
+      <div class="card-body pad-t-sm">
+        <div class="tabs-list" role="tablist" data-tabs="ext">
+          <button class="tabs-trigger" role="tab" aria-selected="true" data-panel="ext-win">Win rate</button>
+          <button class="tabs-trigger" role="tab" aria-selected="false" data-panel="ext-ratio">κ ratio</button>
+          <button class="tabs-trigger" role="tab" aria-selected="false" data-panel="ext-table">Table</button>
+        </div>
+        <div class="tabs-panel" id="ext-win"><div id="extWin"></div></div>
+        <div class="tabs-panel" id="ext-ratio" hidden><div id="extRatio"></div></div>
+        <div class="tabs-panel" id="ext-table" hidden><div class="tablewrap"><table id="extTable"></table></div></div>
+      </div>
+      <div class="card-footer">Read the trend carefully: part of the improvement at larger N is the chordal baseline degrading faster than the model does, not the model getting better. <strong>And the spread is two seeds, not three</strong> — both multi-seed cells print <code>Skipping seed 20260526 — no checkpoint</code>, so the README's <code>75.7% ± 4.0%</code> over three seeds is not these outputs.</div>
+    </div>
+  </div>
+</section>
+
+<section id="head">
+  <div class="sechead">
+    <p class="eyebrow">05 · Output head</p>
+    <h2>Ordering for free, and the degree of freedom it costs</h2>
+    <p class="lead">Positive increments then a cumulative sum give strictly increasing knots by construction — no sorting, no constrained optimisation, fully differentiable. Genuinely elegant. The normalisation is where it goes wrong.</p>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Drive the head yourself</div>
+        <div class="card-desc">Four sliders stand in for the decoder's raw logits. Watch the pipeline run — and watch the last knot.</div>
+      </div>
+      <div class="card-body pad-t-sm">
+        <pre>raw        = self.knot_head(decoded).squeeze(-1)
+increments = F.softplus(raw) + 1e-6                     <i>strictly positive</i>
+cum        = torch.cumsum(increments, dim=-1)           <i>strictly increasing</i>
+knot_vals[b, :K] = cum[b, :K] / (<u>cum[b, K-1]</u> + 1e-8)   <i>← the divisor</i></pre>
+        <div style="margin-top:14px" class="grid2">
+          <div class="stack-sm" id="dofSliders"></div>
+          <div id="dofTable"></div>
+        </div>
+        <div style="margin-top:12px"><div id="dofLine"></div></div>
+      </div>
+      <div class="card-footer">Move any slider. The first three knots respond; <code>u₄</code> reads <strong>1.000000</strong> for every possible input, because the divisor is the last element of the slice being normalised. That is algebra, not a trained behaviour.</div>
+    </div>
+
+    <div class="alert alert-bad">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+      <div>
+        <div class="at">K knots in, K−1 degrees of freedom out</div>
+        <div class="ad">
+          <p>The last predicted knot carries zero information. It is also a <em>degenerate</em> knot — 1.0 collides with the clamped end knots and makes <code>A</code> singular — which is why <code>rescale_knots_to_interior</code> exists at <code>generalization_experiment.py:98</code>, mapping [0,1] into [0.02, 0.98]. You can read the pin straight out of cell 43's stored output:</p>
+          <pre>Model κ: 107.65, knots: [0.15122412 0.27244648 0.90013417 <s>0.97999999</s>]</pre>
+          <p><strong>Every model output in this repository ends in 0.98.</strong> It is <code>0.02 + 0.96 × 1.0</code>, not a prediction.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">The fix is already written, further down the same notebook</div>
+        <div class="card-desc">Cell 45's L-BFGS refiner parameterises K knots from K+1 unconstrained reals.</div>
+      </div>
+      <div class="card-body pad-t-sm">
+        <pre>def gaps_to_knots(theta):          <i>theta: (K+1,) unconstrained</i>
+    w  = torch.softmax(theta, dim=0)    <i>K+1 positive weights summing to 1</i>
+    cs = torch.cumsum(w, dim=0)[:-1]    <i>K strictly increasing values in (0,1)</i>
+    return EPS_KNOT + (1 - 2*EPS_KNOT) * cs</pre>
+      </div>
+      <div class="card-footer">Predict K+1 increments and slice K. Recovers the lost degree of freedom, removes the need for the rescale entirely, and keeps ordering by construction. Two lines in the head.</div>
+    </div>
+  </div>
+</section>
+
+<section id="solver">
+  <div class="sechead">
+    <p class="eyebrow">06 · Solver</p>
+    <h2>The differentiable bottleneck</h2>
+    <p class="lead">Pure functions, <code>float64</code> throughout, every step batched. This is what makes the project possible — and what the port had to reproduce exactly to match the notebook.</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">A(u) for N = 6 → 8 × 8</div><div class="card-desc">Row labels name what each row constrains.</div></div>
+      <div class="card-body pad-t-sm"><div id="matrixFig"></div></div>
+      <div class="card-footer">The 4-wide band is the local support of a cubic basis. The single cells at <code>t = 0</code> and <code>t = 1</code> are clamping: <code>C(0) = P₀</code>, <code>C(1) = P₇</code>, the latter hardcoded because <code>construct</code>'s intervals are half-open.</div>
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">Deriving the cryptic end row</div></div>
+        <div class="card-body pad-t-sm">
+          <pre>A[:, 0, 0] +=  knots[:, 5]
+A[:, 0, 1] += -knots[:, 4] - knots[:, 5]
+A[:, 0, 2] +=  knots[:, 4]</pre>
+          <p class="tiny" style="margin-top:10px">With <code>u₁ = knots[4]</code>, <code>u₂ = knots[5]</code>: <code>Q₀ = 3(P₁−P₀)/u₁</code>, <code>Q₁ = 3(P₂−P₁)/u₂</code>, <code>R₀ ∝ (Q₁ − Q₀)</code>. Setting <code>C″(0) = R₀ = 0</code> gives <code>u₂·P₀ − (u₁+u₂)·P₁ + u₁·P₂ = 0</code> — exactly those coefficients. So: clamped knot vector, <em>natural</em> end conditions. Both descriptions in the repo are right; they describe different things.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">The lever that makes knots matter</div></div>
+        <div class="card-body pad-t-sm">
+          <pre>Q[:, i] = 3 / (knots[:, i+4] - knots[:, i+1] <u>+ 1e-12</u>)
+          * (C[:, i+1] - C[:, i])</pre>
+          <p class="tiny" style="margin-top:10px">That denominator is a knot <em>difference</em>. Push two knots together and <code>Q</code> blows up. This is how spacing controls velocity and therefore curvature — and <code>1e-12</code> is all that stands between the model and a division by zero.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:1rem">
+    <div class="alert alert-info">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20 20 4M14 4h6v6"/></svg>
+      <div>
+        <div class="at">∂P/∂uₖ = −A⁻¹ (∂A/∂uₖ) P</div>
+        <div class="ad"><p>That formula appears nowhere in the source. <code>solve_nd</code> forms the explicit inverse with <code>torch.linalg.inv_ex</code>, which is differentiable, so autograd derives implicit differentiation through the solve by itself. It is the one ingredient connecting “where the knots are” to “what shape the curve is” differentiably — and what lets a curvature number at the end of the pipeline update transformer weights at the start.</p></div>
+      </div>
+    </div>
+    <div class="alert alert-warn">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg>
+      <div>
+        <div class="at">inv_ex fails quietly, by design</div>
+        <div class="ad"><p>It returns an info code instead of raising on a singular matrix, so a degenerate knot vector yields inf/NaN control points silently, caught downstream by <code>torch.isfinite</code>. Convenient — and, as the buffer box shows in section 09, a trap.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="explorer">
+  <div class="sechead">
+    <p class="eyebrow">07 · Knot explorer</p>
+    <h2>Move the knots and watch the curve</h2>
+    <p class="lead">The notebook's cell-42 sample, solved live. Six fixed points; four numbers you control. Every curve here passes through all six exactly — that part is free. Everything you can change is pacing.</p>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-body">
+        <div class="row" style="justify-content:space-between;margin-bottom:14px">
+          <div class="row" id="presetRow"></div>
+          <div class="row">
+            <button class="btn btn-default btn-sm" id="optBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              Minimise energy
+            </button>
+            <button class="btn btn-ghost btn-sm" id="resetBtn">Reset</button>
+          </div>
+        </div>
+
+        <div class="prog" id="optProg" hidden><span></span></div>
+
+        <div class="grid2" style="margin-top:4px">
+          <div class="stack-sm">
+            <div id="knotSliders" class="stack-sm"></div>
+            <hr class="sep" style="margin:4px 0">
+            <div class="row" style="gap:14px">
+              <label class="switch"><input type="checkbox" id="oComb" checked><span class="trk"></span>Curvature comb</label>
+              <label class="switch"><input type="checkbox" id="oCtrl" checked><span class="trk"></span>Control polygon</label>
+              <label class="switch"><input type="checkbox" id="oBox"><span class="trk"></span>Buffer box</label>
+              <label class="switch"><input type="checkbox" id="oGhost" checked><span class="trk"></span>Ghost comparisons</label>
+              <label class="switch"><input type="checkbox" id="oFit"><span class="trk"></span>Lock frame to data</label>
+            </div>
+            <div class="legend" style="margin-top:4px">
+              <span><i class="dot" style="background:hsl(var(--d-good))"></i>waypoint</span>
+              <span><i class="dot" style="background:hsl(var(--muted-foreground))"></i>control point</span>
+              <span><i class="dot" style="background:hsl(var(--d-bad))"></i>outside box</span>
+              <span><i style="border-color:hsl(var(--d-ink))"></i>your curve</span>
+              <span><i class="dash" style="border-color:hsl(var(--d-chordal))"></i>chordal</span>
+              <span><i class="dash" style="border-color:hsl(var(--d-model))"></i>model</span>
+            </div>
+          </div>
+
+          <div class="stack-sm">
+            <div id="curvePanel"></div>
+            <div id="liveStats"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <strong>Minimise energy</strong> runs projected finite-difference descent on the bending energy, 10 steps per frame, so you can watch the knots relax. The objective resolution is the toggle below the sliders — it matters more than it should, which is section 08.
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header"><div class="card-title">κ along the curve</div><div class="card-desc">Shared log axis, so the three parameterisations are directly comparable. The comb in the panel above is normalised per-curve and is not.</div></div>
+        <div class="card-body pad-t-sm"><div id="kappaProfile"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Knot placement on [0, 1]</div><div class="card-desc">Your knots against the two references. Gaps under 0.05 are called out.</div></div>
+        <div class="card-body pad-t-sm"><div id="knotLines"></div></div>
+        <div class="card-footer">The model drives two knots to each boundary with gaps of 0.011 and 0.013 — which <code>3/Δu</code> turns into enormous control-point excursions.</div>
+      </div>
+    </div>
+
+    <div class="alert alert-bad">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg>
+      <div>
+        <div class="at">The model's “smoother” curve is ten times the size of the data</div>
+        <div class="ad">
+          <div id="extentTable"></div>
+          <p>The model's curve is not smoother in any everyday sense — it is <em>bigger</em>. It leaves the neighbourhood of the data entirely, sweeps a wide arc, and comes back through the remaining points. Take <code>E(u) = ∫ κ² ds</code> and let the interpolant detour at radius R: <code>κ ≈ 1/R</code> so <code>κ² ≈ 1/R²</code>, while the detour's arc length grows like <code>R</code>. The contribution goes like <code>R · 1/R² = 1/R</code>.</p>
+          <p><strong>Bigger loops have lower bending energy.</strong> The objective actively rewards ballooning outward and there is no arc-length term anywhere to stop it. A tenfold energy drop is a formally correct answer to the stated problem and a geometrically useless curve. This is why the model scores 68% on synthetic clouds and <strong>13%</strong> on real GPS turns.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="landscape">
+  <div class="sechead">
+    <p class="eyebrow">08 · Landscape</p>
+    <h2>The energy surface the optimiser is walking</h2>
+    <p class="lead">Fix <code>u₁</code> and <code>u₄</code> at your current values and sweep the middle two. This is the figure cells 42 and 43 were trying to produce — with the marker bug fixed and the quadrature resolved.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div class="row" style="justify-content:space-between;margin-bottom:12px">
+        <div class="row">
+          <span class="badge badge-outline" id="landSlice">slice u₁, u₄</span>
+          <span class="badge badge-warn" id="landStale" hidden>stale — recompute</span>
+        </div>
+        <div class="row">
+          <div class="tabs-list" role="tablist" data-tabs="res">
+            <button class="tabs-trigger" role="tab" aria-selected="true" data-res="40">40 × 40</button>
+            <button class="tabs-trigger" role="tab" aria-selected="false" data-res="64">64 × 64</button>
+          </div>
+          <button class="btn btn-outline btn-sm" id="landBtn">Recompute</button>
+        </div>
+      </div>
+      <div class="prog" id="landProg" hidden><span></span></div>
+      <div class="grid2" style="margin-top:10px;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">
+        <div><canvas class="cvs" id="landCanvas" width="520" height="520"></canvas></div>
+        <div class="stack-sm">
+          <div id="landLegend"></div>
+          <div id="landReadout"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer">
+      Colour is log κ. Hatched region is <code>u₃ ≤ u₂</code> — invalid, no curve exists there. Grid energies use 200 quadrature points for speed; the markers' own κ values are quoted at the converged resolution. Click anywhere valid to jump the explorer there.
+    </div>
+  </div>
+
+  <div class="prose" style="margin-top:1rem">
+    <p>Two things are visible immediately. The surface is <strong>not convex</strong> — there are separated basins, and which one you land in depends entirely on where you start. And the global structure pushes toward the corners, which is the inflation strategy from section 07 showing up as a shape in the objective rather than as a sentence about it.</p>
+    <p>This is also the figure that cell 43 got wrong. Its <code>find_local_min_robust</code> returns an improved κ paired with the <em>initial random knots</em> (<code>best_k_this</code> is never updated), and those knots set <code>k1_fixed</code> and <code>k4_fixed</code> — so the published <code>curvature_landscape_v2.png</code> is a slice through an arbitrary point with a mismarked optimum. Defect 2 below.</p>
+  </div>
+</section>
+
+<section id="quadrature">
+  <div class="sechead">
+    <p class="eyebrow">09 · Quadrature</p>
+    <h2>The energies are grid artifacts</h2>
+    <p class="lead">This is the one finding that came out of building the figures rather than reading the code, and it is the most consequential thing on the page.</p>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">See the grid step over the spike</div>
+        <div class="card-desc">The integrand <code>κ²·speed</code> on a log axis, with the actual sample points the repo uses drawn on top.</div>
+      </div>
+      <div class="card-body pad-t-sm">
+        <div class="row" style="margin-bottom:10px">
+          <div class="tabs-list" role="tablist" data-tabs="alias">
+            <button class="tabs-trigger" role="tab" aria-selected="true" data-alias="50">num_pts 50 · training</button>
+            <button class="tabs-trigger" role="tab" aria-selected="false" data-alias="100">num_pts 100 · eval</button>
+            <button class="tabs-trigger" role="tab" aria-selected="false" data-alias="1600">num_pts 1600 · converged</button>
+          </div>
+        </div>
+        <div id="aliasChart"></div>
+      </div>
+      <div class="card-footer">
+        The chordal integrand peaks at <strong>6.3 × 10⁵</strong> at <code>t = 0.570</code> while its median is about 1 — three orders of magnitude of dynamic range inside a spike narrower than the grid spacing. At <code>num_pts = 100</code>, <code>Δt = 0.0101</code>. Which samples happen to land near the peak determines the answer, so the number is an aliasing artifact rather than an approximation.
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Convergence sweep</div><div class="card-desc">The repository's own quadrature formula, resolution swept. Dashed lines are the converged values.</div></div>
+        <div class="card-body pad-t-sm"><div id="convChart"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">What each resolution reports</div></div>
+        <div class="card-body pad-t-sm" style="padding:0">
+          <div class="tablewrap"><table id="convTable"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-bad">
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+      <div>
+        <div class="at">Three things this breaks</div>
+        <div class="ad">
+          <ol>
+            <li><strong>Absolute κ is wrong by 2–12×.</strong> On this sample the evaluation setting reports 711.5 against a true 2855.4 for chordal, and 68.4 against 139.2 for the model.</li>
+            <li><strong>The ratio is wrong by about 2×.</strong> <code>num_pts = 100</code> gives 0.0962; converged is 0.0487. The ratio is the project's headline metric.</li>
+            <li><strong>The training objective is a different function from the evaluation metric.</strong> At <code>N_QUAD = 50</code> the same two curves read 4936.8 and 16.1 — ratio <strong>0.0033</strong>, off by a factor of 15, and wrong in the opposite direction for each curve. Phase 2 was not minimising a noisy version of the eval metric; it was minimising a different quantity.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">Two caveats on scope</div></div>
+        <div class="card-body pad-t-sm">
+          <p class="tiny">This is <em>one</em> sample, selected by cell 42 precisely for being hard (<code>chord κ &gt; 500</code>), so it is the worst case rather than the typical one. And medians over 500 samples are more robust than any single value — aliasing error that is roughly symmetric across a population partly cancels in a median. Whether it does here is an open question that one sweep would answer: recompute the stored evaluation sets at <code>num_pts = 2000</code> and see whether the win rates move. Until that is run, every absolute κ and every ratio in the repository should be treated as resolution-dependent.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">The fix is cheap</div></div>
+        <div class="card-body pad-t-sm">
+          <p class="tiny">The integrand is smooth between spikes, so 2,000 uniform points converges and costs 20× one solver pass — nothing next to training. For the training loop, where cost does matter, integrate on a grid refined near the knots, since that is where <code>3/Δu</code> puts the spikes. Separately, the endpoint weights in <code>(h/3)·(4·S1 + 2·S2)</code> give the two end samples weight 2 instead of 1; that error is about 1% and is the least of the problems here.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="box">
+  <div class="sechead">
+    <p class="eyebrow">10 · Buffer box</p>
+    <h2>A correct idea at a catastrophic weight</h2>
+    <p class="lead">You cannot easily penalise “the curve went too far” — that needs sampling and is non-smooth. But a B-spline lies inside the convex hull of its control points, so containing the control points contains the curve. And the control points are right there as the solver's output, differentiable with respect to the knots.</p>
+  </div>
+
+  <div class="stack">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">losses.py — the whole penalty</div></div>
+        <div class="card-body pad-t-sm">
+          <pre>lo     = pts_g.min(dim=1).values
+hi     = pts_g.max(dim=1).values
+center = (0.5*(lo+hi)).unsqueeze(1)
+half   = (0.5*(hi-lo)*(1.0+<b>0.25</b>)).unsqueeze(1)
+excess = torch.clamp((Cc-center).abs()-half, min=0.0)
+return (excess ** 2)<u>.sum()</u></pre>
+          <p class="tiny" style="margin-top:10px"><strong>Squared</strong>, so the penalty is C¹ at the boundary — a plain <code>|excess|</code> would have a gradient kink there and fight Adam. <strong>Summed</strong> over G samples × (N+2) control points × 2 axes with no normalisation: an N = 8 sample has 10 control points against an N = 6 sample's 8, so identical geometric badness costs 25% more. This fine-tune mixes N ∈ {6, 7, 8}, so the penalty is silently N-biased.</p>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="card-header tight"><div class="card-title">Measured on this page</div><div class="card-desc">Computed exactly as <code>losses.py</code> does, including your current knots.</div></div>
+          <div class="card-body pad-t-sm" style="padding:0"><div id="boxTable"></div></div>
+          <div class="card-footer">The idea discriminates perfectly — the sane curve is essentially free, the inflated one is not. It is the <em>magnitude</em> that is unusable.</div>
+        </div>
+        <div class="alert alert-info">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20 20 4M14 4h6v6"/></svg>
+          <div>
+            <div class="at">Its gradient rides the energy's own path</div>
+            <div class="ad"><p><code>C</code> is not a free parameter — it came from the solve. So <code>∂penalty/∂θ = ∂penalty/∂C · (−A⁻¹(∂A/∂u)P) · ∂u/∂θ</code>. The model has no control points to move; it is being told <em>“choose knots whose induced solve keeps the control points near the data.”</em></p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Why λ = 200 destroyed the run</div>
+        <div class="card-desc">The penalty is in squared box-overshoot units; the energy is a curvature integral. Nothing makes them commensurate, so λ had to be calibrated — and it was not.</div>
+      </div>
+      <div class="card-body pad-t-sm">
+        <div class="grid2">
+          <div><div id="lamChart"></div></div>
+          <div class="stack-sm">
+            <div class="sl">
+              <div class="sl-top"><span class="sl-lab">LAMBDA_BOX</span><span class="sl-val" id="lamOut">200</span></div>
+              <input type="range" id="lam" min="0" max="300" step="1" value="200">
+            </div>
+            <div class="sl">
+              <div class="sl-top"><span class="sl-lab">batch-mean Σ excess²</span><span class="sl-val" id="excOut">12.0</span></div>
+              <input type="range" id="exc" min="0" max="360" step="0.5" value="12">
+              <p class="tiny">Never logged by the run. The inflated sample measures <strong>343.7</strong> on its own; a batch mean sits lower, since most samples are not inflated.</p>
+            </div>
+            <div id="lamBars"></div>
+            <div id="lamVerdict"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer">
+        Both bars are the <strong>energy term only</strong>. <code>epoch_capped += float(energy_loss.detach()) * batch_n_valid</code> — the box contribution is in the gradient but never in the log, so the energy plateauing at 2.3× its unpenalised value is the real signal. <code>train_one_epoch</code> already returns <code>box_mean</code>; the fine-tune cell throws it away with <code>train_loss = out[0]</code>.
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">Road fine-tune, 15 real GPS turns</div></div>
+        <div class="card-body pad-t-sm" style="padding:0">
+          <div class="tablewrap"><table>
+            <thead><tr><th>Configuration</th><th class="num">Win</th><th class="num">Median ratio</th><th class="num">Road train κ</th></tr></thead>
+            <tbody>
+              <tr><td>Before fine-tune</td><td class="num">13.3%</td><td class="num">9.637</td><td class="num">—</td></tr>
+              <tr><td>Run 1 — no penalty</td><td class="num">26.7%</td><td class="num">1.661</td><td class="num">254</td></tr>
+              <tr class="flag"><td>Run 2 — box, λ = 200</td><td class="num" style="color:hsl(var(--d-bad));font-weight:600">0.0%</td><td class="num">7.421</td><td class="num" style="color:hsl(var(--d-warn))">~592</td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header tight"><div class="card-title">What to change</div></div>
+        <div class="card-body pad-t-sm">
+          <ol style="font-size:13px">
+            <li><strong>Make the excess dimensionless.</strong> Divide by <code>half</code> before squaring, so the penalty measures relative overshoot. Today a control point five box-widths out contributes its distance squared in raw coordinates, which is why one runaway point can dominate a batch.</li>
+            <li><strong>Use a Huber hinge, not a square.</strong> Quadratic growth on violations this large gives unbounded gradients from a single sample. Smooth-L1 beyond one box-width keeps the signal and bounds the pull.</li>
+            <li><strong>Normalise by <code>(N+2)·2</code></strong> so it is a mean — removes the N-bias, makes λ transferable across lengths.</li>
+            <li><strong>Then calibrate λ against measurement</strong> and ramp it from zero over the first epochs, so the model is not pinned to the box before it has learned anything.</li>
+            <li><strong>Log it.</strong> Print <code>energy_loss</code>, <code>box_loss</code> and <code>λ·box_loss</code> side by side — that would have diagnosed this on epoch 1 instead of after 49 minutes.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="localmin">
+  <div class="sechead">
+    <p class="eyebrow">11 · Local minima</p>
+    <h2>Does one forward pass land on a minimum?</h2>
+    <p class="lead">Cell 45 compares the raw prediction against an L-BFGS refinement of it and against the best of 15 L-BFGS'd random restarts, on 100 held-out N = 6 samples.</p>
+  </div>
+
+  <div class="stack">
+    <div class="grid2" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Model κ vs chordal κ — the ten logged rows</div><div class="card-desc">Log axes. Below the diagonal the model wins.</div></div>
+        <div class="card-body pad-t-sm"><div id="lbfgsChart"></div></div>
+        <div class="card-footer">Eight of ten below the line — and one catastrophe at 16× worse than baseline, which L-BFGS could not rescue because it <em>is</em> a local minimum, just a terrible one. The refined marker sits on top of the model marker for seven of these ten.</div>
+      </div>
+      <div class="stack">
+        <div class="card">
+          <div class="card-header tight"><div class="card-title">Across all 97 valid samples</div></div>
+          <div class="card-body pad-t-sm" style="padding:0">
+            <div class="tablewrap"><table>
+              <thead><tr><th>Method</th><th class="num">Win</th><th class="num">Median κ</th><th class="num">vs chordal</th></tr></thead>
+              <tbody>
+                <tr><td>Chordal</td><td class="num">—</td><td class="num">396.3</td><td class="num">1.000</td></tr>
+                <tr><td>Transformer</td><td class="num">79.4%</td><td class="num">89.6</td><td class="num">0.226</td></tr>
+                <tr><td>+ L-BFGS</td><td class="num">80.4%</td><td class="num">86.2</td><td class="num">0.217</td></tr>
+                <tr><td>Best restart</td><td class="num">90.7%</td><td class="num">130.6</td><td class="num">0.329</td></tr>
+              </tbody>
+            </table></div>
+          </div>
+          <div class="card-footer"><code>refined / model = 0.9620</code>. A second-order optimiser handed the model's answer cannot improve it — 81.4% of samples by under 5%, the median by 0.0%. One forward pass lands <em>on</em> a local minimum, in about a millisecond.</div>
+        </div>
+        <div class="alert alert-warn">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5M12 17h.01"/></svg>
+          <div>
+            <div class="at">With the caveat section 09 adds</div>
+            <div class="ad"><p>The objective L-BFGS descended is the <code>num_pts = 100</code> quadrature. On a spiky integrand that grid is aliased, so part of what the refiner found flat belongs to the grid rather than the energy. “At a local minimum of the computed objective” is established; “of the true bending energy” needs the same run at converged resolution.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">Three caveats the print statements obscure</div></div>
+      <div class="card-body pad-t-sm" style="padding:0">
+        <div class="tablewrap"><table class="wide">
+          <thead><tr><th>What it printed</th><th>Why it misleads</th></tr></thead>
+          <tbody>
+            <tr><td class="mn">best/refined = 1.5150<br>“model found the BEST local minimum”</td><td>The thresholds are one-sided (<code>&gt; 0.95</code>, <code>&gt; 0.90</code>) and assume ratios below 1. Random restarts were <em>worse</em>, so both strings fire spuriously. Do not copy them into the paper.</td></tr>
+            <tr><td class="mn">Win: model 79.4% vs restarts 90.7%</td><td>Restarts win more often while having a <em>higher</em> median κ. They dodge the model's rare catastrophes but usually land in worse basins. <strong>Medians hide this entirely</strong> — p95 and the catastrophe rate matter more for anything deployed.</td></tr>
+            <tr><td class="mn">GRADIENT ANALYSIS — nothing printed</td><td><code>valid_gn</code> was empty: all 97 per-sample <code>‖∇κ‖</code> computations threw or returned non-finite, silently, via <code>except Exception: grad_norms.append(nan)</code>. The most direct stationarity evidence is missing from the result.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card-footer"><code>experiments/local_min_lbfgs/README.md</code> already flags that these numbers are not comparable to the top-level README's table (ratio 0.140, 96% win), which used Adam, a different sample set — median chordal 133.8 against 396.3 here — and a different restart budget. Pick one protocol before the paper reports either.</div>
+    </div>
+  </div>
+</section>
+
+<section id="defects">
+  <div class="sechead">
+    <p class="eyebrow">12 · Defects</p>
+    <h2>Four things to fix before anything is published</h2>
+    <p class="lead">Ordered by how much they invalidate. The first one touches every number in the repository.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-body" style="padding:4px 18px">
+      <div class="acc-item">
+        <button class="acc-trig" aria-expanded="true" data-acc="d1">
+          <span class="badge badge-destructive">critical</span>
+          <span>1 · The quadrature does not resolve its integrand</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="acc-panel" id="d1">
+          <p>Section 09 in full. <code>num_pts = 100</code> misstates absolute κ by 2–12× and the ratio by about 2× on a hard sample; <code>N_QUAD = 50</code> in training misstates the ratio by 15×, in opposite directions for the two curves. Sweep the stored evaluation sets at converged resolution before reporting any κ or any ratio.</p>
+        </div>
+      </div>
+
+      <div class="acc-item">
+        <button class="acc-trig" aria-expanded="false" data-acc="d2">
+          <span class="badge badge-warn">figure</span>
+          <span>2 · The heatmap's local-minimum marker is plotted at the wrong point</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="acc-panel" id="d2" hidden>
+          <pre>best_k_this = init.copy()
+...
+    if k_eval &lt; best_kappa_this:
+        best_kappa_this = k_eval
+        <u>best_k</u> = knots.detach().numpy().copy()   <i># writes best_k</i>
+if best_kappa_this &lt; best_overall_kappa:
+    best_overall_kappa = best_kappa_this
+    best_overall_k     = <s>best_k_this</s>             <i># reads best_k_this</i></pre>
+          <p><code>best_k</code> is a dead store; <code>best_k_this</code> is never updated after initialisation. The function returns an improved κ paired with the <em>initial random knots</em>. Everything downstream inherits it: those knots set <code>k1_fixed</code> and <code>k4_fixed</code>, which define the slice the heatmap is computed on. So <code>curvature_landscape_v2.png</code> is a slice through an arbitrary point with a mismarked optimum. One-line fix: <code>best_k_this = knots.detach().numpy().copy()</code>. Section 08 above is the corrected version.</p>
+        </div>
+      </div>
+
+      <div class="acc-item">
+        <button class="acc-trig" aria-expanded="false" data-acc="d3">
+          <span class="badge badge-warn">reproducibility</span>
+          <span>3 · The device global makes results depend on cell execution order</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="acc-panel" id="d3" hidden>
+          <p>Cell 42 sets <code>cl.device = DEVICE</code> (CUDA) then builds <strong>CPU</strong> tensors. <code>construct</code> allocates CUDA temporaries internally, they meet CPU inputs, a <code>RuntimeError</code> is raised, and <code>except Exception: break</code> swallows it on iteration zero. The stored output confirms it:</p>
+          <pre>Local min knots   : [0.0342271 0.04479033 0.96740919 0.98]  <i># identical to the model's</i>
+  curvature       : <s>inf</s></pre>
+          <p>So cell 42's local-minimum result is an artifact, not a finding. Cell 45's trace <em>does</em> show real improvements, which means it ran in a session where <code>cl.device</code> was CPU — <strong>the validity of that experiment depends on which cells you ran first.</strong></p>
+          <p>Root fix: derive the device from the inputs (<code>dev = knots.device</code>) throughout <code>construct</code>, <code>de_boor</code>, <code>solve_nd</code> and the derivative functions. That makes the solver device-agnostic and deletes both the cell-18 monkey-patch and this whole class of silent failure.</p>
+        </div>
+      </div>
+
+      <div class="acc-item" style="border-bottom:0">
+        <button class="acc-trig" aria-expanded="false" data-acc="d4">
+          <span class="badge badge-warn">latent</span>
+          <span>4 · The box penalty can poison a whole batch</span>
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="acc-panel" id="d4" hidden>
+          <pre>batch_box_sum.append(buffer_box_penalty(C, pts_g))   <s># BEFORE the finite check</s>
+finite = torch.isfinite(eng)
+eng_ok = eng[finite]                                  <i># energy drops bad samples</i></pre>
+          <p>The energy term carefully drops non-finite samples; the box term does not — it is computed on the whole group's <code>C</code> before any filtering. When <code>inv_ex</code> hits a near-singular <code>A</code>, <code>C</code> holds inf/NaN, the energy is correctly dropped, and the box penalty still enters the loss. Then <code>loss</code> is NaN, <code>backward()</code> gives NaN gradients, <code>clip_grad_norm_</code> does <em>not</em> remove them (it scales by a norm that is itself NaN), and <code>optim.step()</code> writes NaN into the weights.</p>
+          <p>It evidently did not fire in the stored run. But <code>nan_skips</code> is returned by <code>train_one_epoch</code> and discarded by the caller, so there is no evidence either way. Mask the box term by <code>finite</code> too, and guard with <code>if not torch.isfinite(loss): continue</code>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="summary">
+  <div class="sechead">
+    <p class="eyebrow">Summary</p>
+    <h2>Four sentences and an order of work</h2>
+  </div>
+  <div class="grid2">
+    <div class="card"><div class="card-body">
+      <ol style="font-size:13.5px">
+        <li>Knots are the only free variable, and they are simultaneously the knot vector and the data parameterisation — pacing is the right intuition.</li>
+        <li>The entire chain is differentiable, the linear solve included, so the curve's own curvature is the training signal and no label exists anywhere in the system.</li>
+        <li>The buffer box is the right idea at the wrong weight <em>and in the wrong units</em>: the energy genuinely rewards inflation, the convex-hull property gives a differentiable handle on it, but raw squared overshoot at λ = 200 is a hard constraint whose feasible set excludes the good solutions.</li>
+        <li>Underneath all of it the quadrature does not resolve the integrand it is integrating, so the absolute energies, the headline ratios and the training signal are all resolution-dependent.</li>
+      </ol>
+    </div></div>
+    <div class="card">
+      <div class="card-header tight"><div class="card-title">In order</div></div>
+      <div class="card-body pad-t-sm">
+        <ol style="font-size:13.5px">
+          <li>Sweep the evaluation sets at converged quadrature. Everything else is measured through this.</li>
+          <li>Recover the pinned degree of freedom in the output head — the code already exists in cell 45.</li>
+          <li>Make the solver device-agnostic.</li>
+          <li>Re-specify the box penalty in relative units with a Huber hinge, then calibrate λ.</li>
+          <li>Run <code>Phase2_RealTurns_TripSplit.ipynb</code>; the 15-turn results cannot support a conclusion either way.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+  </main>
+</div>
+
+<footer class="gut" style="border-top:1px solid hsl(var(--border));background:hsl(var(--muted)/.3)">
+  <div style="max-width:1360px;margin:0 auto;padding:22px 0;font-size:12.5px;line-height:1.6;color:hsl(var(--muted-foreground))">
+    Read from <span class="mono">notebooks/Phase2_BufferBox.ipynb</span> (51 cells, stored outputs included) plus <span class="mono">knot_transformer.py</span>, <span class="mono">curvature_layer_nd.py</span>, <span class="mono">losses.py</span> and <span class="mono">generalization_experiment.py</span>.
+    Training and evaluation results are the notebook's own stored outputs; nothing was re-run.
+    Curves, combs, knot lines, κ profiles, the energy landscape, the convergence sweep, the feature matrix and the box penalties are computed in this page by a port of the repository's solver, validated against the notebook's energies.
+    Interface built on the shadcn/ui design system — its token set, radius scale and component recipes implemented directly, since shadcn ships as copy-in components rather than a CDN bundle.
+  </div>
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   1. B-spline engine — port of curvature_layer_nd.py
+   ═══════════════════════════════════════════════════════════════════ */
+function fullKnots(u){ return [0,0,0,0].concat(u,[1,1,1,1]); }
+
+function basis(U,p,t){
+  var m=U.length,i,q,Nv=new Array(m-1);
+  for(i=0;i<m-1;i++) Nv[i]=(t>=U[i]&&t<U[i+1])?1:0;
+  for(q=1;q<=p;q++){
+    var nx=new Array(m-1-q);
+    for(i=0;i<m-1-q;i++){
+      var a=0,b=0,d1=U[i+q]-U[i],d2=U[i+q+1]-U[i+1];
+      if(d1>0) a=(t-U[i])/d1*Nv[i];
+      if(d2>0) b=(U[i+q+1]-t)/d2*Nv[i+1];
+      nx[i]=a+b;
+    }
+    Nv=nx;
+  }
+  return Nv;
+}
+
+function buildA(u,n){
+  var U=fullKnots(u),size=n+2,i,j,A=[];
+  for(i=0;i<size;i++) A.push(new Array(size).fill(0));
+  var u1=U[4],u2=U[5];
+  A[0][0]=u2; A[0][1]=-(u1+u2); A[0][2]=u1;
+  for(i=0;i<n;i++){
+    var t=U[i+3],row=A[i+1];
+    if(t>=1-1e-12){ row[n+1]=1; }
+    else { var Nv=basis(U,3,t); for(j=0;j<size;j++) row[j]=Nv[j]||0; }
+  }
+  var uK=U[n+1],uK1=U[n];
+  A[size-1][size-3]=1-uK;
+  A[size-1][size-2]=uK+uK1-2;
+  A[size-1][size-1]=1-uK1;
+  return {A:A,U:U};
+}
+
+function solveLin(A,B){
+  var n=A.length,i,j,k,r,M=[];
+  for(i=0;i<n;i++) M.push(A[i].slice().concat(B[i].slice()));
+  for(k=0;k<n;k++){
+    var piv=k,best=Math.abs(M[k][k]);
+    for(r=k+1;r<n;r++){ if(Math.abs(M[r][k])>best){ best=Math.abs(M[r][k]); piv=r; } }
+    if(best<1e-14) return null;
+    if(piv!==k){ var tm=M[k]; M[k]=M[piv]; M[piv]=tm; }
+    for(r=k+1;r<n;r++){
+      var f=M[r][k]/M[k][k];
+      if(f===0) continue;
+      for(j=k;j<n+2;j++) M[r][j]-=f*M[k][j];
+    }
+  }
+  var X=[];
+  for(i=0;i<n;i++) X.push([0,0]);
+  for(var c=0;c<2;c++){
+    for(i=n-1;i>=0;i--){
+      var s=M[i][n+c];
+      for(j=i+1;j<n;j++) s-=M[i][j]*X[j][c];
+      X[i][c]=s/M[i][i];
+    }
+  }
+  return X;
+}
+
+function derivCtrl(C,U){
+  var i,Q=[],nC=C.length;
+  for(i=0;i<nC-1;i++){
+    var d=U[i+4]-U[i+1],s=d>0?3/d:0;
+    Q.push([s*(C[i+1][0]-C[i][0]), s*(C[i+1][1]-C[i][1])]);
+  }
+  var dU=U.slice(1,-1),R=[];
+  for(i=0;i<Q.length-1;i++){
+    var d2=dU[i+3]-dU[i+1],s2=d2>0?2/d2:0;
+    R.push([s2*(Q[i+1][0]-Q[i][0]), s2*(Q[i+1][1]-Q[i][1])]);
+  }
+  return {Q:Q,dU:dU,R:R,ddU:dU.slice(1,-1)};
+}
+
+function evalAt(C,U,dv,t){
+  var tc=Math.min(Math.max(t,0),1-1e-9),i;
+  var N0=basis(U,3,tc),N1=basis(dv.dU,2,tc),N2=basis(dv.ddU,1,tc);
+  var p=[0,0],d1=[0,0],d2=[0,0];
+  for(i=0;i<C.length;i++){ p[0]+=N0[i]*C[i][0]; p[1]+=N0[i]*C[i][1]; }
+  for(i=0;i<dv.Q.length;i++){ d1[0]+=N1[i]*dv.Q[i][0]; d1[1]+=N1[i]*dv.Q[i][1]; }
+  for(i=0;i<dv.R.length;i++){ d2[0]+=N2[i]*dv.R[i][0]; d2[1]+=N2[i]*dv.R[i][1]; }
+  return {p:p,d1:d1,d2:d2};
+}
+
+function kappaAt(s){
+  var sp2=s.d1[0]*s.d1[0]+s.d1[1]*s.d1[1]+1e-12;
+  var cr=s.d1[0]*s.d2[1]-s.d1[1]*s.d2[0];
+  return { k:Math.abs(cr)/(sp2*Math.sqrt(sp2)), sign:(cr<0?-1:1), speed:Math.sqrt(sp2) };
+}
+
+/* the repo's own quadrature: h=1/(M-1), (h/3)(4·odd + 2·even) */
+function energyRepo(C,U,dv,M){
+  var S1=0,S2=0,h=1/(M-1);
+  for(var i=0;i<M;i++){
+    var kk=kappaAt(evalAt(C,U,dv,i/(M-1)));
+    var tm=kk.k*kk.k*kk.speed;
+    if(i%2===1) S1+=tm; else S2+=tm;
+  }
+  return (h/3)*(4*S1+2*S2);
+}
+
+function prep(pts,u){
+  var n=pts.length,ab=buildA(u,n),U=ab.U,i,rhs=[[0,0]];
+  for(i=0;i<n;i++) rhs.push([pts[i][0],pts[i][1]]);
+  rhs.push([0,0]);
+  var C=solveLin(ab.A,rhs);
+  if(!C) return null;
+  return { pts:pts, u:u.slice(), U:U, C:C, dv:derivCtrl(C,U) };
+}
+
+function buildCase(pts,u,nSamp){
+  var o=prep(pts,u);
+  if(!o) return null;
+  var M=nSamp||600,i,samples=[];
+  for(i=0;i<M;i++){
+    var t=i/(M-1),s=evalAt(o.C,o.U,o.dv,t),kk=kappaAt(s);
+    samples.push({t:t,p:s.p,d1:s.d1,k:kk.k,sign:kk.sign,integ:kk.k*kk.k*kk.speed});
+  }
+  var res=0;
+  for(i=0;i<pts.length;i++){
+    var sp=evalAt(o.C,o.U,o.dv,o.U[i+3]);
+    res=Math.max(res,Math.hypot(sp.p[0]-pts[i][0],sp.p[1]-pts[i][1]));
+  }
+  var ks=samples.map(function(s){return s.k;}).slice().sort(function(a,b){return a-b;});
+  o.samples=samples; o.residual=res;
+  o.kMed=ks[Math.floor(ks.length*0.5)];
+  o.k90=ks[Math.floor(ks.length*0.90)]||1;
+  o.kMax=ks[ks.length-1];
+  o.k50q=energyRepo(o.C,o.U,o.dv,50);
+  o.k100q=energyRepo(o.C,o.U,o.dv,100);
+  o.kConv=energyRepo(o.C,o.U,o.dv,3200);
+  return o;
+}
+
+function energyOf(pts,u,M){
+  var o=prep(pts,u);
+  if(!o) return Infinity;
+  var e=energyRepo(o.C,o.U,o.dv,M);
+  return isFinite(e)?e:Infinity;
+}
+
+function boxPenalty(o,margin){
+  var pts=o.pts,i,d;
+  var lo=[Infinity,Infinity],hi=[-Infinity,-Infinity];
+  for(i=0;i<pts.length;i++) for(d=0;d<2;d++){
+    if(pts[i][d]<lo[d]) lo[d]=pts[i][d];
+    if(pts[i][d]>hi[d]) hi[d]=pts[i][d];
+  }
+  var center=[0.5*(lo[0]+hi[0]),0.5*(lo[1]+hi[1])];
+  var half=[0.5*(hi[0]-lo[0])*(1+margin),0.5*(hi[1]-lo[1])*(1+margin)];
+  var total=0,outside=0,per=[];
+  for(i=0;i<o.C.length;i++){
+    var ex=[0,0];
+    for(d=0;d<2;d++) ex[d]=Math.max(Math.abs(o.C[i][d]-center[d])-half[d],0);
+    var e2=ex[0]*ex[0]+ex[1]*ex[1];
+    total+=e2; if(e2>0) outside++;
+    per.push({ex:ex,e2:e2});
+  }
+  return {lo:lo,hi:hi,center:center,half:half,total:total,outside:outside,per:per};
+}
+
+function extentOf(o,which){
+  var b={x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity};
+  function add(p){
+    if(p[0]<b.x0)b.x0=p[0]; if(p[0]>b.x1)b.x1=p[0];
+    if(p[1]<b.y0)b.y0=p[1]; if(p[1]>b.y1)b.y1=p[1];
+  }
+  if(which==='curve') o.samples.forEach(function(s){add(s.p);});
+  else if(which==='ctrl') o.C.forEach(add);
+  else o.pts.forEach(add);
+  return b;
+}
+
+/* geometric features, port of compute_geometric_features */
+function geoFeatures(pts){
+  var N=pts.length,i;
+  var chord=[],centri=[],ct=0,cnt=0;
+  for(i=0;i<N-1;i++){
+    var dx=pts[i+1][0]-pts[i][0],dy=pts[i+1][1]-pts[i][1];
+    var L=Math.hypot(dx,dy);
+    chord.push(L); centri.push(Math.sqrt(L+1e-8));
+    ct+=L; cnt+=Math.sqrt(L+1e-8);
+  }
+  ct+=1e-8; cnt+=1e-8;
+  var chordCum=[0],centriCum=[0],acc=0,acc2=0;
+  for(i=0;i<N-1;i++){ acc+=chord[i]/ct; acc2+=centri[i]/cnt; chordCum.push(acc); centriCum.push(acc2); }
+  var localFrac=[0];
+  for(i=0;i<N-1;i++) localFrac.push(chord[i]/ct);
+  localFrac=localFrac.slice(0,N);
+  var angles=new Array(N).fill(0);
+  for(i=1;i<N-1;i++){
+    var v1=[pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]];
+    var v2=[pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]];
+    var cr=v1[0]*v2[1]-v1[1]*v2[0],dt=v1[0]*v2[0]+v1[1]*v2[1];
+    angles[i]=(Math.atan2(cr,dt)+Math.PI)/(2*Math.PI);
+  }
+  var rows=[];
+  for(i=0;i<N;i++) rows.push([pts[i][0],pts[i][1],chordCum[i],localFrac[i],angles[i],centriCum[i]]);
+  return rows;
+}
+
+function centripetalKnots(pts){
+  var i,d=[],tot=0;
+  for(i=0;i<pts.length-1;i++){
+    var L=Math.hypot(pts[i+1][0]-pts[i][0],pts[i+1][1]-pts[i][1]);
+    var s=Math.sqrt(L); d.push(s); tot+=s;
+  }
+  var out=[],acc=0;
+  for(i=0;i<pts.length-2;i++){ acc+=d[i]; out.push(acc/tot); }
+  return out;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   2. Data from the notebook's stored outputs
+   ═══════════════════════════════════════════════════════════════════ */
+var PTS=[
+  [ 0.1144607,  -0.02903495],
+  [-0.44626413,  0.13820953],
+  [-0.14740674,  0.21086831],
+  [ 0.31514286,  0.05016787],
+  [-0.05143829,  0.41838578],
+  [ 0.43318564,  0.45778141]
+];
+var U_CHORD=[0.24501364,0.37379954,0.57883911,0.796404];
+var U_MODEL=[0.0342271,0.04479033,0.96740919,0.98];
+var NB={chordal:711.51,model:68.42};
+var EPS=0.02, MINGAP=0.008;
+
+var REF=[
+  {key:'chordal',name:'Chordal',u:U_CHORD,nb:NB.chordal,col:'var(--d-chordal)'},
+  {key:'model',  name:'Model',  u:U_MODEL,nb:NB.model,  col:'var(--d-model)'}
+];
+REF.forEach(function(r){ r.cas=buildCase(PTS,r.u); r.box=boxPenalty(r.cas,0.25); });
+
+var PRESETS=[
+  {id:'chordal',  label:'Chordal',     u:U_CHORD},
+  {id:'model',    label:'Model',       u:U_MODEL},
+  {id:'uniform',  label:'Uniform',     u:[0.2,0.4,0.6,0.8]},
+  {id:'centri',   label:'Centripetal', u:centripetalKnots(PTS)}
+];
+
+var EXTRAP=[
+  {N:4,K:2,split:'trained',  win:0.724,wLo:0.722,wHi:0.726,ratio:0.2568,rLo:0.2516,rHi:0.2620},
+  {N:5,K:3,split:'trained',  win:0.718,wLo:0.714,wHi:0.722,ratio:0.3476,rLo:0.3247,rHi:0.3704},
+  {N:6,K:4,split:'held-out', win:0.696,wLo:0.692,wHi:0.700,ratio:0.2522,rLo:0.2494,rHi:0.2551},
+  {N:7,K:5,split:'far',      win:0.673,wLo:0.664,wHi:0.682,ratio:0.3583,rLo:0.3250,rHi:0.3915},
+  {N:8,K:6,split:'far',      win:0.718,wLo:0.710,wHi:0.726,ratio:0.2950,rLo:0.2878,rHi:0.3021}
+];
+
+var LBFGS=[
+  {i:10, chord:91.5,  model:12.0,  refined:12.0},
+  {i:20, chord:482.6, model:978.7, refined:723.0},
+  {i:30, chord:94.8,  model:35.0,  refined:35.0},
+  {i:40, chord:69.0,  model:22.4,  refined:22.2},
+  {i:50, chord:414.2, model:15.5,  refined:15.5},
+  {i:60, chord:1195.8,model:81.5,  refined:81.5},
+  {i:70, chord:234.5, model:3703.1,refined:3628.2},
+  {i:80, chord:35.8,  model:14.9,  refined:14.9},
+  {i:90, chord:442.9, model:122.5, refined:122.5},
+  {i:100,chord:530.3, model:10.4,  refined:10.4}
+];
+
+var BUDGET=[
+  {name:'decoder ×3',      v:200256,hot:1},
+  {name:'encoder ×3',      v:149952,hot:1},
+  {name:'knot_head',       v:2113,  hot:0},
+  {name:'point_pos_embed', v:640,   hot:0},
+  {name:'input_proj',      v:448,   hot:0},
+  {name:'knot_queries',    v:384,   hot:0}
+];
+
+var SECTIONS=[
+  {id:'top',        label:'Overview',        group:'Start'},
+  {id:'classes',    label:'Classes',         group:'Reference'},
+  {id:'params',     label:'Parameters',      group:'Reference'},
+  {id:'dataflow',   label:'Dataflow',        group:'Reference'},
+  {id:'attention',  label:'Attention',       group:'Architecture'},
+  {id:'head',       label:'Output head',     group:'Architecture'},
+  {id:'solver',     label:'Solver',          group:'Architecture'},
+  {id:'explorer',   label:'Knot explorer',   group:'Interactive'},
+  {id:'landscape',  label:'Landscape',       group:'Interactive'},
+  {id:'quadrature', label:'Quadrature',      group:'Findings'},
+  {id:'box',        label:'Buffer box',      group:'Findings'},
+  {id:'localmin',   label:'Local minima',    group:'Findings'},
+  {id:'defects',    label:'Defects',         group:'Findings'},
+  {id:'summary',    label:'Summary',         group:'Findings'}
+];
+
+/* ═══════════════════════════════════════════════════════════════════
+   3. helpers
+   ═══════════════════════════════════════════════════════════════════ */
+function $(id){ return document.getElementById(id); }
+function E(n){ return Math.round(n*1000)/1000; }
+function iFmt(n){ return Math.round(n).toLocaleString('en-US'); }
+function kFmt(n){
+  if(!isFinite(n)) return '∞';
+  if(n>=1000) return n.toFixed(0);
+  if(n>=100) return n.toFixed(1);
+  if(n>=1) return n.toFixed(2);
+  return n.toFixed(3);
+}
+function svg(w,h,label,cls){
+  return '<svg class="chart '+(cls||'')+'" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="'+label+'">';
+}
+function cssVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+/* ── tabs ─────────────────────────────────────────────────────────── */
+document.querySelectorAll('[data-tabs]').forEach(function(list){
+  list.addEventListener('click',function(ev){
+    var btn=ev.target.closest('.tabs-trigger');
+    if(!btn) return;
+    var trigs=list.querySelectorAll('.tabs-trigger');
+    trigs.forEach(function(t){ t.setAttribute('aria-selected', t===btn?'true':'false'); });
+    if(btn.dataset.panel){
+      trigs.forEach(function(t){
+        var p=$(t.dataset.panel);
+        if(p) p.hidden = (t!==btn);
+      });
+    }
+    if(btn.dataset.res){ landRes=parseInt(btn.dataset.res,10); markLandStale(true); }
+    if(btn.dataset.alias){ aliasM=parseInt(btn.dataset.alias,10); drawAlias(); }
+  });
+});
+
+/* ── accordion ────────────────────────────────────────────────────── */
+document.querySelectorAll('.acc-trig').forEach(function(t){
+  t.addEventListener('click',function(){
+    var open=t.getAttribute('aria-expanded')==='true';
+    t.setAttribute('aria-expanded',open?'false':'true');
+    var p=$(t.dataset.acc);
+    if(p) p.hidden=open;
+  });
+});
+
+/* ── nav rail ─────────────────────────────────────────────────────── */
+(function(){
+  var rail=$('rail'),strip=$('mstrip');
+  if(!rail) return;
+  var groups=[],byGroup={};
+  SECTIONS.forEach(function(s){
+    if(!byGroup[s.group]){ byGroup[s.group]=[]; groups.push(s.group); }
+    byGroup[s.group].push(s);
+  });
+  rail.innerHTML=groups.map(function(g){
+    return '<div class="rail-group"><div class="rail-title">'+g+'</div>'+
+      byGroup[g].map(function(s){
+        return '<a href="#'+s.id+'" data-nav="'+s.id+'">'+s.label+'</a>';
+      }).join('')+'</div>';
+  }).join('');
+  if(strip){
+    strip.innerHTML=SECTIONS.map(function(s){
+      return '<a href="#'+s.id+'" data-mnav="'+s.id+'">'+s.label+'</a>';
+    }).join('');
+  }
+  var links=rail.querySelectorAll('[data-nav]');
+  var mlinks=strip?strip.querySelectorAll('[data-mnav]'):[];
+  function mark(id){
+    links.forEach(function(a){ a.classList.toggle('on',a.dataset.nav===id); });
+    Array.prototype.forEach.call(mlinks,function(a){ a.classList.toggle('on',a.dataset.mnav===id); });
+  }
+  if('IntersectionObserver' in window){
+    var seen={};
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ seen[e.target.id]=e.isIntersecting?e.intersectionRatio:0; });
+      var bestId=null,bestV=-1;
+      SECTIONS.forEach(function(s){
+        var v=seen[s.id]||0;
+        if(v>bestV){ bestV=v; bestId=s.id; }
+      });
+      if(bestId&&bestV>0) mark(bestId);
+    },{rootMargin:'-96px 0px -55% 0px',threshold:[0,0.15,0.4,0.8]});
+    SECTIONS.forEach(function(s){ var el=$(s.id); if(el) io.observe(el); });
+  }
+  mark('top');
+})();
+
+/* ═══════════════════════════════════════════════════════════════════
+   4. static figures
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── verification table ───────────────────────────────────────────── */
+(function(){
+  var t=$('verifyTable');
+  if(!t) return;
+  t.innerHTML='<thead><tr><th>Knot vector</th><th class="num">This page · num_pts 100</th>'+
+    '<th class="num">Notebook</th><th class="num">Agreement</th><th class="num">Interp. residual</th></tr></thead><tbody>'+
+    REF.map(function(r){
+      var d=Math.abs(r.cas.k100q-r.nb);
+      return '<tr><td class="mn"><strong>'+r.name+'</strong></td>'+
+        '<td class="num">'+r.cas.k100q.toFixed(4)+'</td>'+
+        '<td class="num">'+r.nb.toFixed(2)+'</td>'+
+        '<td class="num">'+(d<0.02
+          ? '<span class="badge badge-good">match</span>'
+          : '<span class="badge badge-destructive">Δ '+d.toFixed(3)+'</span>')+'</td>'+
+        '<td class="num">'+r.cas.residual.toExponential(1)+'</td></tr>';
+    }).join('')+'</tbody>';
+})();
+
+/* ── parameter budget ─────────────────────────────────────────────── */
+(function(){
+  var el=$('budgetChart');
+  if(!el) return;
+  var W=440,x0=124,x1=W-64,total=353793,y=16,bh=20,gap=11;
+  var H=y+BUDGET.length*(bh+gap)+30;
+  var s=svg(W,H,'Parameter counts per submodule');
+  BUDGET.forEach(function(d){
+    var w=Math.max((d.v/total)*(x1-x0),2);
+    s+='<text x="'+(x0-9)+'" y="'+(y+14)+'" text-anchor="end" class="ink">'+d.name+'</text>';
+    s+='<rect x="'+x0+'" y="'+y+'" width="'+E(w)+'" height="'+bh+'" rx="3" fill="hsl(var('+
+       (d.hot?'--d-chordal':'--d-warn')+'))" opacity="'+(d.hot?0.9:0.85)+'"/>';
+    s+='<text x="'+E(x0+w+7)+'" y="'+(y+14)+'">'+iFmt(d.v)+'</text>';
+    y+=bh+gap;
+  });
+  s+='<line x1="'+x0+'" y1="'+(y-gap+5)+'" x2="'+x1+'" y2="'+(y-gap+5)+'" stroke="hsl(var(--border))"/>';
+  s+='<text x="'+(x0-9)+'" y="'+(y+15)+'" text-anchor="end" class="ink b">total</text>';
+  s+='<text x="'+x0+'" y="'+(y+15)+'" class="ink b">353,793</text>';
+  s+='</svg>';
+  el.innerHTML=s;
+})();
+
+/* ── shape flow ───────────────────────────────────────────────────── */
+(function(){
+  var el=$('flowChart');
+  if(!el) return;
+  var steps=[
+    {t:'points',   s:'(B, N, 2)',  ch:2,  who:''},
+    {t:'+ features',s:'(B, N, 6)', ch:6,  who:'compute_geometric_features'},
+    {t:'input_proj',s:'(B, N, 64)',ch:64, who:'nn.Linear(6, 64)'},
+    {t:'encoder',  s:'(B, N, 64)', ch:64, who:'3 × TransformerEncoderLayer'},
+    {t:'queries',  s:'(B, 6, 64)', ch:64, who:'nn.Embedding(6, 64)'},
+    {t:'decoder',  s:'(B, 6, 64)', ch:64, who:'3 × TransformerDecoderLayer'},
+    {t:'knot_head',s:'(B, 6)',     ch:1,  who:'Linear 64→32→1, GELU'},
+    {t:'knots',    s:'(B, N+6)',   ch:1,  who:'softplus · cumsum · normalise'}
+  ];
+  var W=520,rowH=34,H=steps.length*rowH+14,x0=112,maxW=200;
+  var s=svg(W,H,'Tensor shape flow through the model');
+  steps.forEach(function(d,i){
+    var y=10+i*rowH;
+    var w=Math.max(6,(d.ch/64)*maxW);
+    var hot=(i===6);
+    s+='<text x="'+(x0-9)+'" y="'+(y+14)+'" text-anchor="end" class="ink b">'+d.t+'</text>';
+    s+='<rect x="'+x0+'" y="'+(y+3)+'" width="'+E(w)+'" height="18" rx="3" fill="hsl(var('+
+       (hot?'--d-warn':'--d-chordal')+'))" opacity="'+(hot?0.9:0.26+0.5*(d.ch/64))+'"/>';
+    s+='<text x="'+(x0+maxW+12)+'" y="'+(y+16)+'" class="ink">'+d.s+'</text>';
+    if(d.who) s+='<text x="'+(x0+maxW+108)+'" y="'+(y+16)+'">'+d.who+'</text>';
+    if(i<steps.length-1)
+      s+='<path d="M'+(x0-4)+' '+(y+22)+'v'+(rowH-20)+'" stroke="hsl(var(--border))" stroke-width="1.5" fill="none"/>';
+  });
+  s+='</svg>';
+  el.innerHTML=s;
+})();
+
+/* ── feature matrix ───────────────────────────────────────────────── */
+(function(){
+  var el=$('featMatrix');
+  if(!el) return;
+  var rows=geoFeatures(PTS);
+  var names=['x','y','chord_cum','local_frac','angles','centri_cum'];
+  var mins=[],maxs=[];
+  for(var c=0;c<6;c++){
+    var col=rows.map(function(r){return r[c];});
+    mins.push(Math.min.apply(null,col)); maxs.push(Math.max.apply(null,col));
+  }
+  var cw=66,rh=26,x0=26,y0=34;
+  var W=x0+6*cw+6,H=y0+6*rh+8;
+  var s=svg(W,H,'The six input channels for each of the six sample points');
+  names.forEach(function(n,c){
+    s+='<text x="'+(x0+c*cw+cw/2)+'" y="'+(y0-9)+'" text-anchor="middle" class="ink">'+n+'</text>';
+  });
+  rows.forEach(function(r,i){
+    s+='<text x="'+(x0-7)+'" y="'+(y0+i*rh+17)+'" text-anchor="end">'+i+'</text>';
+    r.forEach(function(v,c){
+      var rng=maxs[c]-mins[c]||1;
+      var a=0.09+0.5*((v-mins[c])/rng);
+      s+='<rect x="'+(x0+c*cw+1)+'" y="'+(y0+i*rh+1)+'" width="'+(cw-2)+'" height="'+(rh-2)+
+         '" rx="3" fill="hsl(var(--d-chordal))" opacity="'+E(a)+'"/>';
+      s+='<text x="'+(x0+c*cw+cw/2)+'" y="'+(y0+i*rh+17)+'" text-anchor="middle" class="ink">'+
+         v.toFixed(3)+'</text>';
+    });
+  });
+  s+='</svg>';
+  el.innerHTML=s;
+
+  /* chord_cum[1..N-2] must equal the chordal interior knot vector exactly */
+  var ff=$('featFoot');
+  if(ff){
+    var mid=rows.slice(1,rows.length-1).map(function(r){ return r[2]; });
+    var maxd=Math.max.apply(null,mid.map(function(v,i){ return Math.abs(v-U_CHORD[i]); }));
+    ff.innerHTML='Shading is per-column, min to max. '+
+      'Note column 3: <code>chord_cum</code> at the interior points reads <span class="mono">['+
+      mid.map(function(v){return v.toFixed(5);}).join(', ')+']</span>, and the notebook’s chordal knot vector is <span class="mono">['+
+      U_CHORD.map(function(v){return v.toFixed(5);}).join(', ')+']</span> — identical to '+
+      maxd.toExponential(0)+'. <strong>The chordal heuristic is not a baseline the model is compared against; it is literally one of its input channels.</strong> '+
+      'Which is why Phase 1 is close to a copy operation and Phase 2 at <code>lr = 1e-5</code> only has to learn a correction.';
+  }
+})();
+
+/* ── attention shapes ─────────────────────────────────────────────── */
+(function(){
+  var el=$('attnShapes');
+  if(!el) return;
+  var W=440,H=168,s=svg(W,H,'Encoder self-attention and decoder cross-attention shapes');
+  function grid(ox,oy,rows,cols,cell,col,lab,sub){
+    var out='';
+    for(var r=0;r<rows;r++) for(var c=0;c<cols;c++){
+      var a=0.14+0.5*Math.exp(-Math.abs(r-c)/2.2);
+      out+='<rect x="'+(ox+c*cell)+'" y="'+(oy+r*cell)+'" width="'+(cell-1.5)+'" height="'+(cell-1.5)+
+           '" rx="1.5" fill="hsl(var('+col+'))" opacity="'+E(a)+'"/>';
+    }
+    out+='<text x="'+ox+'" y="'+(oy-8)+'" class="ink b">'+lab+'</text>';
+    out+='<text x="'+ox+'" y="'+(oy+rows*cell+14)+'">'+sub+'</text>';
+    return out;
+  }
+  s+=grid(16,36,6,6,18,'--d-chordal','encoder — N × N','every point attends to every point');
+  s+=grid(230,36,6,6,18,'--d-model','decoder — 6 × N','6 fixed query slots × N points');
+  s+='<text x="16" y="'+(H-8)+'">shading is a distance-decay illustration — the repo ships no trained weights</text>';
+  s+='</svg>';
+  el.innerHTML=s;
+})();
+
+/* ── collocation matrix ───────────────────────────────────────────── */
+(function(){
+  var el=$('matrixFig');
+  if(!el) return;
+  var cell=26,x0=78,y0=24,n=8,W=x0+n*cell+14,H=y0+n*cell+26;
+  var rows=[
+    {l:'C″(0)=0',c:[0,1,2],k:'w'},
+    {l:'t = 0',   c:[0],      k:'a'},
+    {l:'t = u₁',  c:[0,1,2,3],k:'a'},
+    {l:'t = u₂',  c:[1,2,3,4],k:'a'},
+    {l:'t = u₃',  c:[2,3,4,5],k:'a'},
+    {l:'t = u₄',  c:[3,4,5,6],k:'a'},
+    {l:'t = 1',   c:[7],      k:'a'},
+    {l:'C″(1)=0',c:[5,6,7],  k:'w'}
+  ];
+  var s=svg(W,H,'Structure of the 8 by 8 collocation matrix');
+  rows.forEach(function(r,i){
+    r.c.forEach(function(c){
+      s+='<rect x="'+(x0+c*cell+1.5)+'" y="'+(y0+i*cell+1.5)+'" width="'+(cell-3)+'" height="'+(cell-3)+
+         '" rx="3" fill="hsl(var('+(r.k==='w'?'--d-warn':'--d-chordal')+'))" opacity="0.88"/>';
+    });
+    s+='<text x="'+(x0-9)+'" y="'+(y0+i*cell+17)+'" text-anchor="end" class="'+(r.k==='w'?'b':'ink')+
+       '" fill="hsl(var('+(r.k==='w'?'--d-warn':'--foreground')+'))">'+r.l+'</text>';
+  });
+  s+='<g fill="none" stroke="hsl(var(--border))"><rect x="'+x0+'" y="'+y0+'" width="'+(n*cell)+'" height="'+(n*cell)+'" rx="4"/>';
+  for(var g=1;g<n;g++){
+    s+='<line x1="'+(x0+g*cell)+'" y1="'+y0+'" x2="'+(x0+g*cell)+'" y2="'+(y0+n*cell)+'"/>';
+    s+='<line x1="'+x0+'" y1="'+(y0+g*cell)+'" x2="'+(x0+n*cell)+'" y2="'+(y0+g*cell)+'"/>';
+  }
+  s+='</g>';
+  s+='<text x="'+(x0+n*cell/2)+'" y="'+(H-7)+'" text-anchor="middle">control point index  0 … 7</text>';
+  s+='</svg>';
+  el.innerHTML=s;
+})();
+
+/* ── extrapolation charts ─────────────────────────────────────────── */
+(function(){
+  function bars(el,key,lo,hi,fmt,title,col){
+    var W=480,H=190,pad={l:46,r:14,t:16,b:40};
+    var cw=(W-pad.l-pad.r)/EXTRAP.length;
+    function Y(v){ return (H-pad.b)-(v-lo)/(hi-lo)*(H-pad.b-pad.t); }
+    var s=svg(W,H,title);
+    var ticks=[lo,(lo+hi)/2,hi];
+    ticks.forEach(function(g){
+      s+='<line x1="'+pad.l+'" y1="'+E(Y(g))+'" x2="'+(W-pad.r)+'" y2="'+E(Y(g))+
+         '" stroke="hsl(var(--d-grid))" stroke-dasharray="2 3"/>';
+      s+='<text x="'+(pad.l-7)+'" y="'+E(Y(g)+3)+'" text-anchor="end">'+fmt(g)+'</text>';
+    });
+    EXTRAP.forEach(function(d,i){
+      var cx=pad.l+i*cw+cw/2,bw=Math.min(cw*0.5,38);
+      var v=d[key],vl=d[key==='win'?'wLo':'rLo'],vh=d[key==='win'?'wHi':'rHi'];
+      var dim=d.split==='trained';
+      s+='<rect x="'+E(cx-bw/2)+'" y="'+E(Y(v))+'" width="'+bw+'" height="'+E((H-pad.b)-Y(v))+
+         '" rx="3" fill="hsl(var('+col+'))" opacity="'+(dim?0.42:0.92)+'"/>';
+      s+='<line x1="'+E(cx)+'" y1="'+E(Y(vl))+'" x2="'+E(cx)+'" y2="'+E(Y(vh))+
+         '" stroke="hsl(var(--foreground))" stroke-width="1.3"/>';
+      s+='<line x1="'+E(cx-4)+'" y1="'+E(Y(vh))+'" x2="'+E(cx+4)+'" y2="'+E(Y(vh))+'" stroke="hsl(var(--foreground))" stroke-width="1.3"/>';
+      s+='<line x1="'+E(cx-4)+'" y1="'+E(Y(vl))+'" x2="'+E(cx+4)+'" y2="'+E(Y(vl))+'" stroke="hsl(var(--foreground))" stroke-width="1.3"/>';
+      s+='<text x="'+E(cx)+'" y="'+E(Y(v)-7)+'" text-anchor="middle" class="ink b">'+fmt(v)+'</text>';
+      s+='<text x="'+E(cx)+'" y="'+(H-22)+'" text-anchor="middle" class="ink">N='+d.N+'</text>';
+      s+='<text x="'+E(cx)+'" y="'+(H-10)+'" text-anchor="middle">'+d.split+'</text>';
+    });
+    s+='<line x1="'+pad.l+'" y1="'+(H-pad.b)+'" x2="'+(W-pad.r)+'" y2="'+(H-pad.b)+'" stroke="hsl(var(--border))"/>';
+    s+='</svg>';
+    el.innerHTML=s;
+  }
+  if($('extWin')) bars($('extWin'),'win',0.60,0.78,function(v){return (v*100).toFixed(1)+'%';},'Win rate by sequence length','--d-chordal');
+  if($('extRatio')) bars($('extRatio'),'ratio',0.20,0.42,function(v){return v.toFixed(3);},'Curvature ratio by sequence length','--d-model');
+  var t=$('extTable');
+  if(t){
+    t.innerHTML='<thead><tr><th>N</th><th>K</th><th>Split</th><th class="num">Win</th><th class="num">Ratio</th></tr></thead><tbody>'+
+      EXTRAP.map(function(d){
+        var b=d.split==='trained'?'badge-secondary':(d.split==='held-out'?'badge-chordal':'badge-model');
+        return '<tr><td class="num">'+d.N+'</td><td class="num">'+d.K+'</td>'+
+          '<td><span class="badge '+b+'">'+d.split+'</span></td>'+
+          '<td class="num">'+(d.win*100).toFixed(1)+'%</td>'+
+          '<td class="num">'+d.ratio.toFixed(4)+'</td></tr>';
+      }).join('')+'</tbody>';
+  }
+})();
+
+/* ── output-head dof demo ─────────────────────────────────────────── */
+(function(){
+  var sl=$('dofSliders');
+  if(!sl) return;
+  var raw=[0.2,-0.4,0.9,0.1];
+  sl.innerHTML=raw.map(function(v,i){
+    return '<div class="sl"><div class="sl-top"><span class="sl-lab">raw['+i+']</span>'+
+      '<span class="sl-val" id="dofV'+i+'">'+v.toFixed(2)+'</span></div>'+
+      '<input type="range" id="dofR'+i+'" min="-3" max="3" step="0.05" value="'+v+'"></div>';
+  }).join('');
+  function softplus(x){ return x>30?x:Math.log1p(Math.exp(x)); }
+  function render(){
+    var r=raw.map(function(_,i){ return parseFloat($('dofR'+i).value); });
+    r.forEach(function(v,i){ $('dofV'+i).textContent=v.toFixed(2); });
+    var inc=r.map(function(v){ return softplus(v)+1e-6; });
+    var cum=[],acc=0;
+    inc.forEach(function(v){ acc+=v; cum.push(acc); });
+    var tot=cum[cum.length-1];
+    var kn=cum.map(function(v){ return v/(tot+1e-8); });
+    var sc=kn.map(function(v){ return EPS+(1-2*EPS)*v; });
+    $('dofTable').innerHTML='<div class="tablewrap"><table><thead><tr><th>i</th>'+
+      '<th class="num">raw</th><th class="num">softplus</th><th class="num">cumsum</th>'+
+      '<th class="num">÷ cum[3]</th><th class="num">rescaled</th></tr></thead><tbody>'+
+      r.map(function(v,i){
+        var last=i===3;
+        return '<tr'+(last?' class="flag"':'')+'><td class="num">'+i+'</td>'+
+          '<td class="num">'+v.toFixed(2)+'</td>'+
+          '<td class="num">'+inc[i].toFixed(4)+'</td>'+
+          '<td class="num">'+cum[i].toFixed(4)+'</td>'+
+          '<td class="num"'+(last?' style="font-weight:700;color:hsl(var(--d-bad))"':'')+'>'+kn[i].toFixed(6)+'</td>'+
+          '<td class="num">'+sc[i].toFixed(6)+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+    var W=460,H=64,x0=14,x1=W-14;
+    var s=svg(W,H,'Where the four knots land after normalisation');
+    s+='<line x1="'+x0+'" y1="32" x2="'+x1+'" y2="32" stroke="hsl(var(--border))" stroke-width="2"/>';
+    [0,1].forEach(function(v){
+      s+='<line x1="'+(x0+v*(x1-x0))+'" y1="24" x2="'+(x0+v*(x1-x0))+'" y2="40" stroke="hsl(var(--muted-foreground))"/>';
+      s+='<text x="'+(x0+v*(x1-x0))+'" y="56" text-anchor="middle">'+v+'</text>';
+    });
+    sc.forEach(function(v,i){
+      var X=x0+v*(x1-x0),last=i===3;
+      s+='<line x1="'+E(X)+'" y1="20" x2="'+E(X)+'" y2="44" stroke="hsl(var('+(last?'--d-bad':'--d-chordal')+'))" stroke-width="2.4"/>';
+      s+='<circle cx="'+E(X)+'" cy="32" r="3.6" fill="hsl(var('+(last?'--d-bad':'--d-chordal')+'))"/>';
+      s+='<text x="'+E(X)+'" y="15" text-anchor="middle" class="b" fill="hsl(var('+(last?'--d-bad':'--d-chordal')+'))">u'+(i+1)+'</text>';
+    });
+    s+='<text x="'+(x1)+'" y="56" text-anchor="end" fill="hsl(var(--d-bad))">u₄ pinned at 0.98</text>';
+    s+='</svg>';
+    $('dofLine').innerHTML=s;
+  }
+  raw.forEach(function(_,i){ $('dofR'+i).addEventListener('input',render); });
+  render();
+})();
+
+/* ═══════════════════════════════════════════════════════════════════
+   5. knot explorer
+   ═══════════════════════════════════════════════════════════════════ */
+var cur=U_MODEL.slice(), curCase=null, objM=100, optTimer=null;
+
+function project(u){
+  var v=u.slice().sort(function(a,b){return a-b;}),i,n=v.length;
+  for(i=0;i<n;i++) v[i]=Math.min(Math.max(v[i],EPS),1-EPS);
+  /* forward pass: open every gap to at least MINGAP */
+  for(i=1;i<n;i++) if(v[i]<v[i-1]+MINGAP) v[i]=v[i-1]+MINGAP;
+  /* backward pass: if that pushed past the top, pull the whole chain down */
+  if(v[n-1]>1-EPS) v[n-1]=1-EPS;
+  for(i=n-1;i>0;i--) if(v[i-1]>v[i]-MINGAP) v[i-1]=v[i]-MINGAP;
+  /* only reachable if n·MINGAP cannot fit in [EPS, 1-EPS] */
+  if(v[0]<EPS) for(i=0;i<n;i++) v[i]=EPS+(1-2*EPS)*(i+1)/(n+1);
+  return v;
+}
+
+(function(){
+  var el=$('knotSliders');
+  if(!el) return;
+  el.innerHTML=cur.map(function(v,i){
+    return '<div class="sl"><div class="sl-top"><span class="sl-lab">u'+(i+1)+'</span>'+
+      '<span class="sl-val" id="kv'+i+'">'+v.toFixed(4)+'</span></div>'+
+      '<input type="range" id="kr'+i+'" min="0.02" max="0.98" step="0.001" value="'+v+'"></div>';
+  }).join('')+
+  '<div class="row" style="margin-top:4px;gap:8px"><span class="sl-lab">objective</span>'+
+  '<div class="tabs-list" role="tablist" data-tabs="obj">'+
+  '<button class="tabs-trigger" role="tab" aria-selected="true" data-obj="100">num_pts 100</button>'+
+  '<button class="tabs-trigger" role="tab" aria-selected="false" data-obj="1600">converged</button>'+
+  '</div></div>';
+
+  cur.forEach(function(_,i){
+    $('kr'+i).addEventListener('input',function(){
+      var u=cur.slice();
+      u[i]=parseFloat(this.value);
+      cur=project(u);
+      syncSliders(); refresh(); markLandStale(true); markPreset(null);
+    });
+  });
+
+  var objList=el.querySelector('[data-tabs="obj"]');
+  objList.addEventListener('click',function(ev){
+    var b=ev.target.closest('.tabs-trigger');
+    if(!b) return;
+    objList.querySelectorAll('.tabs-trigger').forEach(function(t){
+      t.setAttribute('aria-selected',t===b?'true':'false');
+    });
+    objM=parseInt(b.dataset.obj,10);
+  });
+})();
+
+function syncSliders(){
+  cur.forEach(function(v,i){
+    var r=$('kr'+i); if(r&&parseFloat(r.value)!==v) r.value=v;
+    var o=$('kv'+i); if(o) o.textContent=v.toFixed(4);
+  });
+}
+
+(function(){
+  var row=$('presetRow');
+  if(!row) return;
+  row.innerHTML='<span class="sl-lab" style="margin-right:4px">preset</span>'+
+    PRESETS.map(function(p){
+      return '<button class="btn btn-outline btn-sm" data-pre="'+p.id+'">'+p.label+'</button>';
+    }).join('');
+  row.addEventListener('click',function(ev){
+    var b=ev.target.closest('[data-pre]');
+    if(!b) return;
+    var p=PRESETS.filter(function(x){return x.id===b.dataset.pre;})[0];
+    if(!p) return;
+    cur=project(p.u.slice());
+    syncSliders(); refresh(); markLandStale(true); markPreset(p.id);
+  });
+})();
+
+function markPreset(id){
+  document.querySelectorAll('[data-pre]').forEach(function(b){
+    b.classList.toggle('on',b.dataset.pre===id);
+  });
+}
+
+function opts(){
+  return {
+    comb:$('oComb').checked, ctrl:$('oCtrl').checked, box:$('oBox').checked,
+    ghost:$('oGhost').checked, fit:$('oFit').checked
+  };
+}
+['oComb','oCtrl','oBox','oGhost','oFit'].forEach(function(id){
+  var e=$(id); if(e) e.addEventListener('change',refresh);
+});
+
+function frameFor(o,o2){
+  var b=extentOf(o,'curve'),e=extentOf(o,'pts');
+  b.x0=Math.min(b.x0,e.x0); b.y0=Math.min(b.y0,e.y0);
+  b.x1=Math.max(b.x1,e.x1); b.y1=Math.max(b.y1,e.y1);
+  if(o2){
+    var g=extentOf(o2,'curve');
+    b.x0=Math.min(b.x0,g.x0); b.y0=Math.min(b.y0,g.y0);
+    b.x1=Math.max(b.x1,g.x1); b.y1=Math.max(b.y1,g.y1);
+  }
+  var px=(b.x1-b.x0)*0.07||0.1,py=(b.y1-b.y0)*0.07||0.1;
+  return {x0:b.x0-px,y0:b.y0-py,x1:b.x1+px,y1:b.y1+py};
+}
+
+function drawPanel(o,box,op){
+  var W=380,H=330,pad=22,b;
+  if(op.fit){
+    var e=extentOf(o,'pts');
+    var mx=(e.x1-e.x0)*0.4,my=(e.y1-e.y0)*0.4;
+    b={x0:e.x0-mx,y0:e.y0-my,x1:e.x1+mx,y1:e.y1+my};
+  } else {
+    b=frameFor(o);
+    if(op.box){
+      b.x0=Math.min(b.x0,box.center[0]-box.half[0]); b.x1=Math.max(b.x1,box.center[0]+box.half[0]);
+      b.y0=Math.min(b.y0,box.center[1]-box.half[1]); b.y1=Math.max(b.y1,box.center[1]+box.half[1]);
+    }
+  }
+  var bw=Math.max(b.x1-b.x0,1e-6),bh=Math.max(b.y1-b.y0,1e-6);
+  var sc=Math.min((W-2*pad)/bw,(H-2*pad)/bh);
+  var ox=(W-bw*sc)/2-b.x0*sc, oy=(H-bh*sc)/2+b.y1*sc;
+  function P(p){ return [p[0]*sc+ox, oy-p[1]*sc]; }
+
+  var s=svg(W,H,'B-spline through six waypoints for the current knot vector');
+  s+='<defs><clipPath id="pclip"><rect x="0" y="0" width="'+W+'" height="'+H+'" rx="6"/></clipPath></defs>';
+  s+='<g clip-path="url(#pclip)">';
+
+  var dbb=extentOf(o,'pts'),tl=P([dbb.x0,dbb.y1]);
+  s+='<rect x="'+E(tl[0])+'" y="'+E(tl[1])+'" width="'+E((dbb.x1-dbb.x0)*sc)+'" height="'+E((dbb.y1-dbb.y0)*sc)+
+     '" fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="1" stroke-dasharray="4 3" opacity="0.6"/>';
+
+  if(op.box){
+    var btl=P([box.center[0]-box.half[0],box.center[1]+box.half[1]]);
+    s+='<rect x="'+E(btl[0])+'" y="'+E(btl[1])+'" width="'+E(2*box.half[0]*sc)+'" height="'+E(2*box.half[1]*sc)+
+       '" fill="none" stroke="hsl(var(--d-good))" stroke-width="1.5" stroke-dasharray="6 4"/>';
+  }
+
+  if(op.ghost){
+    REF.forEach(function(r){
+      var d=r.cas.samples.map(function(sm,i){ var q=P(sm.p); return (i?'L':'M')+E(q[0])+' '+E(q[1]); }).join('');
+      s+='<path d="'+d+'" fill="none" stroke="hsl('+r.col+')" stroke-width="1.4" stroke-dasharray="5 4" opacity="0.6"/>';
+    });
+  }
+
+  if(op.comb){
+    var cl=0.15*Math.min(bw,bh)*sc,teeth='';
+    o.samples.forEach(function(sm,i){
+      if(i%3) return;
+      var sp=Math.hypot(sm.d1[0],sm.d1[1])||1;
+      var nx=-sm.d1[1]/sp*sm.sign, ny=sm.d1[0]/sp*sm.sign;
+      var L=Math.min(sm.k/o.k90,1.7)*cl, a=P(sm.p);
+      teeth+='M'+E(a[0])+' '+E(a[1])+'L'+E(a[0]+nx*L)+' '+E(a[1]-ny*L);
+    });
+    if(teeth) s+='<path d="'+teeth+'" stroke="hsl(var(--d-warn))" stroke-width="1" opacity="0.5" fill="none"/>';
+  }
+
+  if(op.ctrl){
+    var poly=o.C.map(function(p){ var q=P(p); return E(q[0])+','+E(q[1]); }).join(' ');
+    s+='<polyline points="'+poly+'" fill="none" stroke="hsl(var(--muted-foreground))" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>';
+    o.C.forEach(function(p,i){
+      var q=P(p),out=op.box&&box.per[i].e2>0;
+      s+='<circle cx="'+E(q[0])+'" cy="'+E(q[1])+'" r="'+(out?4.2:3)+'" fill="hsl(var('+(out?'--d-bad':'--muted-foreground')+'))"/>';
+    });
+  }
+
+  var dd=o.samples.map(function(sm,i){ var q=P(sm.p); return (i?'L':'M')+E(q[0])+' '+E(q[1]); }).join('');
+  s+='<path d="'+dd+'" fill="none" stroke="hsl(var(--d-ink))" stroke-width="2.3" stroke-linecap="round"/>';
+
+  o.pts.forEach(function(p,i){
+    var q=P(p);
+    s+='<circle cx="'+E(q[0])+'" cy="'+E(q[1])+'" r="4.6" fill="hsl(var(--d-good))" stroke="hsl(var(--card))" stroke-width="1.6"/>';
+    s+='<text x="'+E(q[0]+7)+'" y="'+E(q[1]-6)+'" class="b" fill="hsl(var(--d-good))">'+i+'</text>';
+  });
+  s+='</g>';
+  s+='<text x="'+(W-7)+'" y="'+(H-7)+'" text-anchor="end">frame '+bw.toFixed(2)+' × '+bh.toFixed(2)+' units</text>';
+  s+='</svg>';
+  return s;
+}
+
+function refresh(){
+  curCase=buildCase(PTS,cur);
+  if(!curCase){ $('curvePanel').innerHTML='<p class="tiny">solver singular at this knot vector</p>'; return; }
+  var box=boxPenalty(curCase,0.25);
+  curCase.box=box;
+  $('curvePanel').innerHTML=drawPanel(curCase,box,opts());
+
+  var ce=extentOf(curCase,'ctrl'),cv=extentOf(curCase,'curve');
+  var dbb=extentOf(curCase,'pts');
+  var factor=Math.max((cv.x1-cv.x0)/(dbb.x1-dbb.x0),(cv.y1-cv.y0)/(dbb.y1-dbb.y0));
+  $('liveStats').innerHTML=
+    '<div class="card"><div class="card-body" style="padding:12px 14px">'+
+    '<dl class="kv">'+
+    '<dt>κ · num_pts 50</dt><dd>'+kFmt(curCase.k50q)+'</dd>'+
+    '<dt>κ · num_pts 100</dt><dd>'+kFmt(curCase.k100q)+'</dd>'+
+    '<dt>κ · converged</dt><dd style="font-weight:700">'+kFmt(curCase.kConv)+'</dd>'+
+    '<dt>vs chordal</dt><dd>'+(curCase.kConv/REF[0].cas.kConv).toFixed(4)+'</dd>'+
+    '<dt>curve extent</dt><dd>'+factor.toFixed(1)+'× data box</dd>'+
+    '<dt>ctrl pts outside box</dt><dd>'+box.outside+' / '+curCase.C.length+'</dd>'+
+    '<dt>Σ excess²</dt><dd'+(box.total>1?' style="color:hsl(var(--d-bad))"':'')+'>'+box.total.toFixed(3)+'</dd>'+
+    '</dl></div></div>';
+
+  drawKappa(); drawKnotLines(); drawExtents(); drawBoxTable(); drawLandMarkers();
+}
+
+/* ── κ profile ────────────────────────────────────────────────────── */
+function drawKappa(){
+  var el=$('kappaProfile'); if(!el) return;
+  var W=480,H=240,pad={l:46,r:92,t:14,b:34};
+  var lo=Math.log10(0.01),hi=Math.log10(5000);
+  function X(t){ return pad.l+t*(W-pad.l-pad.r); }
+  function Y(k){ return (H-pad.b)-(Math.log10(Math.max(k,0.01))-lo)/(hi-lo)*(H-pad.b-pad.t); }
+  var s=svg(W,H,'Curvature along the curve, log scale');
+  [0.01,0.1,1,10,100,1000].forEach(function(g){
+    s+='<line x1="'+pad.l+'" y1="'+E(Y(g))+'" x2="'+(W-pad.r)+'" y2="'+E(Y(g))+
+       '" stroke="hsl(var(--d-grid))" stroke-dasharray="2 3"/>';
+    s+='<text x="'+(pad.l-6)+'" y="'+E(Y(g)+3)+'" text-anchor="end">'+(g<1?g:iFmt(g))+'</text>';
+  });
+  [0,0.25,0.5,0.75,1].forEach(function(t){
+    s+='<text x="'+E(X(t))+'" y="'+(H-18)+'" text-anchor="middle">'+t+'</text>';
+  });
+  s+='<text x="'+E(X(0.5))+'" y="'+(H-5)+'" text-anchor="middle" class="ink">parameter t</text>';
+  REF.forEach(function(r,i){
+    var d=r.cas.samples.map(function(sm,j){ return (j?'L':'M')+E(X(sm.t))+' '+E(Y(sm.k)); }).join('');
+    s+='<path d="'+d+'" fill="none" stroke="hsl('+r.col+')" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.8"/>';
+    s+='<circle cx="'+(W-84)+'" cy="'+(pad.t+6+i*15)+'" r="4" fill="hsl('+r.col+')"/>';
+    s+='<text x="'+(W-76)+'" y="'+(pad.t+9+i*15)+'">'+r.name+'</text>';
+  });
+  if(curCase){
+    var d2=curCase.samples.map(function(sm,j){ return (j?'L':'M')+E(X(sm.t))+' '+E(Y(sm.k)); }).join('');
+    s+='<path d="'+d2+'" fill="none" stroke="hsl(var(--d-ink))" stroke-width="2"/>';
+    s+='<circle cx="'+(W-84)+'" cy="'+(pad.t+36)+'" r="4" fill="hsl(var(--d-ink))"/>';
+    s+='<text x="'+(W-76)+'" y="'+(pad.t+39)+'">yours</text>';
+  }
+  s+='<line x1="'+pad.l+'" y1="'+(H-pad.b)+'" x2="'+(W-pad.r)+'" y2="'+(H-pad.b)+'" stroke="hsl(var(--border))"/>';
+  s+='</svg>';
+  el.innerHTML=s;
+}
+
+/* ── knot lines ───────────────────────────────────────────────────── */
+function drawKnotLines(){
+  var el=$('knotLines'); if(!el) return;
+  var rows=[{name:'Yours',u:cur,col:'var(--d-ink)'}].concat(REF.map(function(r){
+    return {name:r.name,u:r.u,col:r.col};
+  }));
+  var W=480,rowH=52,H=rows.length*rowH+26,x0=86,x1=W-22;
+  function X(u){ return x0+u*(x1-x0); }
+  var s=svg(W,H,'Interior knot placement on the unit interval');
+  rows.forEach(function(r,i){
+    var y=26+i*rowH;
+    s+='<text x="'+(x0-9)+'" y="'+(y+4)+'" text-anchor="end" class="ink b">'+r.name+'</text>';
+    s+='<line x1="'+x0+'" y1="'+y+'" x2="'+x1+'" y2="'+y+'" stroke="hsl(var(--border))" stroke-width="2"/>';
+    r.u.forEach(function(u,j){
+      s+='<line x1="'+E(X(u))+'" y1="'+(y-9)+'" x2="'+E(X(u))+'" y2="'+(y+9)+'" stroke="hsl('+r.col+')" stroke-width="2.2"/>';
+      s+='<circle cx="'+E(X(u))+'" cy="'+y+'" r="3.2" fill="hsl('+r.col+')"/>';
+      var dy=(j%2)?32:21;
+      s+='<text x="'+E(X(u))+'" y="'+(y+dy)+'" text-anchor="middle" fill="hsl('+r.col+')">'+u.toFixed(3)+'</text>';
+    });
+    for(var j=1;j<r.u.length;j++){
+      var gp=r.u[j]-r.u[j-1];
+      if(gp<0.05) s+='<text x="'+E(X((r.u[j]+r.u[j-1])/2))+'" y="'+(y-13)+'" text-anchor="middle" class="b" fill="hsl(var(--d-bad))">gap '+gp.toFixed(3)+'</text>';
+    }
+  });
+  s+='<text x="'+x0+'" y="16">0</text><text x="'+x1+'" y="16" text-anchor="end">1</text>';
+  s+='</svg>';
+  el.innerHTML=s;
+}
+
+/* ── extents ──────────────────────────────────────────────────────── */
+function drawExtents(){
+  var el=$('extentTable'); if(!el) return;
+  var dbb=extentOf(REF[0].cas,'pts');
+  var dw=dbb.x1-dbb.x0,dh=dbb.y1-dbb.y0;
+  var rows=REF.concat(curCase?[{name:'Yours',cas:curCase}]:[]);
+  el.innerHTML='<div class="tablewrap"><table><thead><tr><th>Knots</th>'+
+    '<th class="num">Curve extent</th><th class="num">Control points reach</th><th class="num">vs data box</th></tr></thead><tbody>'+
+    rows.map(function(r){
+      var cv=extentOf(r.cas,'curve'),ce=extentOf(r.cas,'ctrl');
+      var f=Math.max((cv.x1-cv.x0)/dw,(cv.y1-cv.y0)/dh);
+      return '<tr><td class="mn">'+r.name+'</td>'+
+        '<td class="num">'+(cv.x1-cv.x0).toFixed(2)+' × '+(cv.y1-cv.y0).toFixed(2)+'</td>'+
+        '<td class="num">x ['+ce.x0.toFixed(1)+', '+ce.x1.toFixed(1)+']  y ['+ce.y0.toFixed(1)+', '+ce.y1.toFixed(1)+']</td>'+
+        '<td class="num" style="font-weight:600;color:hsl(var('+(f>2?'--d-bad':'--d-good')+'))">'+f.toFixed(1)+'×</td></tr>';
+    }).join('')+
+    '<tr class="total"><td>data bounding box</td><td class="num">'+dw.toFixed(2)+' × '+dh.toFixed(2)+
+    '</td><td class="num">—</td><td class="num">1.0×</td></tr></tbody></table></div>';
+}
+
+/* ── box table ────────────────────────────────────────────────────── */
+function drawBoxTable(){
+  var el=$('boxTable'); if(!el) return;
+  var rows=REF.map(function(r){ return {name:r.name,cas:r.cas,box:r.box}; });
+  if(curCase) rows.push({name:'Yours',cas:curCase,box:curCase.box});
+  el.innerHTML='<div class="tablewrap"><table><thead><tr><th>Knots</th>'+
+    '<th class="num">Outside</th><th class="num">Σ excess²</th><th class="num">× λ=200</th><th class="num">vs own κ</th></tr></thead><tbody>'+
+    rows.map(function(r){
+      var p=200*r.box.total, v=p/Math.max(r.cas.kConv,1e-9);
+      return '<tr><td class="mn">'+r.name+'</td>'+
+        '<td class="num">'+r.box.outside+' / '+r.cas.C.length+'</td>'+
+        '<td class="num">'+r.box.total.toFixed(3)+'</td>'+
+        '<td class="num">'+iFmt(p)+'</td>'+
+        '<td class="num" style="font-weight:600;color:hsl(var('+(v>1?'--d-bad':'--d-good')+'))">'+
+          (v<0.01?'&lt;0.01×':(v>10?iFmt(v):v.toFixed(2))+'×')+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+}
+
+/* ── optimiser ────────────────────────────────────────────────────── */
+(function(){
+  var btn=$('optBtn'),prog=$('optProg'),reset=$('resetBtn');
+  if(!btn) return;
+  reset.addEventListener('click',function(){
+    if(optTimer){ clearTimeout(optTimer); optTimer=null; btn.disabled=false; prog.hidden=true; }
+    cur=project(U_MODEL.slice()); syncSliders(); refresh(); markLandStale(true); markPreset('model');
+  });
+  btn.addEventListener('click',function(){
+    if(optTimer) return;
+    var total=240,done=0,lr=0.0045;
+    btn.disabled=true; prog.hidden=false;
+    markPreset(null);
+    function chunk(){
+      for(var st=0;st<10&&done<total;st++,done++){
+        var e0=energyOf(PTS,cur,objM);
+        if(!isFinite(e0)) break;
+        var g=[],h=4e-4;
+        for(var i=0;i<cur.length;i++){
+          var up=cur.slice(); up[i]+=h; up=project(up);
+          var e1=energyOf(PTS,up,objM);
+          g.push(isFinite(e1)?(e1-e0)/h:0);
+        }
+        var gn=Math.hypot.apply(null,g)||1;
+        var nx=cur.slice();
+        for(i=0;i<nx.length;i++) nx[i]-=lr*g[i]/gn;
+        nx=project(nx);
+        if(energyOf(PTS,nx,objM)<=e0*1.02) cur=nx; else lr*=0.6;
+      }
+      syncSliders(); refresh();
+      prog.firstElementChild.style.width=(100*done/total).toFixed(1)+'%';
+      if(done<total){ optTimer=setTimeout(chunk,0); }
+      else {
+        optTimer=null; btn.disabled=false;
+        setTimeout(function(){ prog.hidden=true; prog.firstElementChild.style.width='0%'; },500);
+        markLandStale(true);
+      }
+    }
+    chunk();
+  });
+})();
+
+/* ═══════════════════════════════════════════════════════════════════
+   6. energy landscape
+   ═══════════════════════════════════════════════════════════════════ */
+var landRes=40, landGrid=null, landMeta=null, landBusy=false;
+var VIRIDIS=[[68,1,84],[72,40,120],[62,74,137],[49,104,142],[38,130,142],[31,158,137],[53,183,121],[109,205,89],[253,231,37]];
+function viridis(t){
+  t=Math.min(Math.max(t,0),1)*(VIRIDIS.length-1);
+  var i=Math.floor(t),f=t-i,a=VIRIDIS[i],b=VIRIDIS[Math.min(i+1,VIRIDIS.length-1)];
+  return [Math.round(a[0]+(b[0]-a[0])*f),Math.round(a[1]+(b[1]-a[1])*f),Math.round(a[2]+(b[2]-a[2])*f)];
+}
+function markLandStale(v){
+  var b=$('landStale'); if(b) b.hidden=!v;
+}
+
+function computeLandscape(){
+  if(landBusy) return;
+  var cvs=$('landCanvas'); if(!cvs) return;
+  landBusy=true;
+  var u1=cur[0],u4=cur[3];
+  var lo=u1+MINGAP, hi=u4-MINGAP;
+  if(hi-lo<0.02){ landBusy=false; $('landReadout').innerHTML='<p class="tiny">u₁ and u₄ are too close together to slice between them. Widen them in the explorer.</p>'; return; }
+  var n=landRes, vals=new Float64Array(n*n), i,j;
+  var prog=$('landProg'); prog.hidden=false;
+  $('landSlice').textContent='slice u₁='+u1.toFixed(3)+'  u₄='+u4.toFixed(3);
+  var row=0;
+  function step(){
+    var t0=Date.now();
+    while(row<n&&Date.now()-t0<24){
+      for(j=0;j<n;j++){
+        var u2=lo+(hi-lo)*(j+0.5)/n, u3=lo+(hi-lo)*(row+0.5)/n;
+        vals[row*n+j]=(u3<=u2+MINGAP)?NaN:energyOf(PTS,[u1,u2,u3,u4],200);
+      }
+      row++;
+    }
+    prog.firstElementChild.style.width=(100*row/n).toFixed(1)+'%';
+    if(row<n){ setTimeout(step,0); return; }
+    landGrid=vals; landMeta={n:n,lo:lo,hi:hi,u1:u1,u4:u4};
+    landBusy=false;
+    prog.hidden=true; prog.firstElementChild.style.width='0%';
+    markLandStale(false);
+    paintLandscape(); drawLandMarkers();
+  }
+  step();
+}
+
+function paintLandscape(){
+  var cvs=$('landCanvas'); if(!cvs||!landGrid||!landMeta) return;
+  var n=landMeta.n, px=cvs.width, ctx=cvs.getContext('2d');
+  var finite=[],i;
+  for(i=0;i<landGrid.length;i++) if(isFinite(landGrid[i])) finite.push(landGrid[i]);
+  finite.sort(function(a,b){return a-b;});
+  var vmin=finite[0]||1, vmax=finite[Math.floor(finite.length*0.98)]||1;
+  var lmin=Math.log10(Math.max(vmin,1e-3)), lmax=Math.log10(Math.max(vmax,vmin*1.001));
+  landMeta.vmin=vmin; landMeta.vmax=vmax;
+  var img=ctx.createImageData(px,px);
+  var cell=px/n;
+  for(var y=0;y<px;y++){
+    var gy=n-1-Math.min(n-1,Math.floor(y/cell));
+    for(var x=0;x<px;x++){
+      var gx=Math.min(n-1,Math.floor(x/cell));
+      var v=landGrid[gy*n+gx],o=(y*px+x)*4;
+      if(!isFinite(v)){
+        var hatch=((x+y)%12<2);
+        img.data[o]=hatch?110:46; img.data[o+1]=hatch?110:46; img.data[o+2]=hatch?118:52; img.data[o+3]=255;
+      } else {
+        var t=(Math.log10(Math.max(v,1e-3))-lmin)/(lmax-lmin||1);
+        var c=viridis(t);
+        img.data[o]=c[0]; img.data[o+1]=c[1]; img.data[o+2]=c[2]; img.data[o+3]=255;
+      }
+    }
+  }
+  ctx.putImageData(img,0,0);
+
+  /* legend */
+  var W=260,H=46,s=svg(W,H,'Colour scale for the energy landscape');
+  var stops=12,bw=(W-70)/stops;
+  for(i=0;i<stops;i++){
+    var c=viridis(i/(stops-1));
+    s+='<rect x="'+(10+i*bw)+'" y="14" width="'+(bw+0.6)+'" height="12" fill="rgb('+c[0]+','+c[1]+','+c[2]+')"/>';
+  }
+  s+='<text x="10" y="9">log κ</text>';
+  s+='<text x="10" y="38">'+kFmt(vmin)+'</text>';
+  s+='<text x="'+(10+stops*bw)+'" y="38" text-anchor="end">'+kFmt(vmax)+'</text>';
+  s+='<rect x="'+(W-52)+'" y="14" width="14" height="12" fill="rgb(46,46,52)"/>';
+  s+='<text x="'+(W-34)+'" y="24">u₃ ≤ u₂</text>';
+  s+='</svg>';
+  $('landLegend').innerHTML=s;
+}
+
+function drawLandMarkers(){
+  var el=$('landReadout'); if(!el) return;
+  if(!landMeta){ el.innerHTML='<p class="tiny">Press <strong>Recompute</strong> to evaluate the surface for the current u₁ and u₄.</p>'; return; }
+  var cvs=$('landCanvas');
+  var marks=[
+    {n:'Chordal',u:U_CHORD,c:'214,118,36'},
+    {n:'Model',u:U_MODEL,c:'240,120,127'},
+    {n:'Yours',u:cur,c:'255,255,255'}
+  ];
+  /* overlay markers on a transparent SVG layer above the canvas */
+  var W=cvs.width;
+  var ov='<svg class="chart" viewBox="0 0 '+W+' '+W+'" style="position:absolute;inset:0;pointer-events:none" aria-hidden="true">';
+  function PX(u2,u3){
+    var f=(u2-landMeta.lo)/(landMeta.hi-landMeta.lo);
+    var g=(u3-landMeta.lo)/(landMeta.hi-landMeta.lo);
+    return [f*W,(1-g)*W];
+  }
+  marks.forEach(function(m){
+    if(m.u[1]<landMeta.lo||m.u[1]>landMeta.hi||m.u[2]<landMeta.lo||m.u[2]>landMeta.hi) return;
+    var p=PX(m.u[1],m.u[2]);
+    ov+='<circle cx="'+E(p[0])+'" cy="'+E(p[1])+'" r="8" fill="none" stroke="rgb('+m.c+')" stroke-width="3"/>';
+    ov+='<circle cx="'+E(p[0])+'" cy="'+E(p[1])+'" r="3" fill="rgb('+m.c+')"/>';
+    ov+='<text x="'+E(p[0]+12)+'" y="'+E(p[1]+4)+'" style="font-family:var(--font-mono);font-size:12px;font-weight:600" fill="rgb('+m.c+')">'+m.n+'</text>';
+  });
+  ov+='</svg>';
+  var holder=cvs.parentNode;
+  holder.style.position='relative';
+  var old=holder.querySelector('svg'); if(old) old.remove();
+  holder.insertAdjacentHTML('beforeend',ov);
+
+  el.innerHTML='<div class="card"><div class="card-body" style="padding:12px 14px"><dl class="kv">'+
+    '<dt>slice u₁</dt><dd>'+landMeta.u1.toFixed(4)+'</dd>'+
+    '<dt>slice u₄</dt><dd>'+landMeta.u4.toFixed(4)+'</dd>'+
+    '<dt>grid</dt><dd>'+landMeta.n+' × '+landMeta.n+'</dd>'+
+    '<dt>κ range shown</dt><dd>'+kFmt(landMeta.vmin)+' – '+kFmt(landMeta.vmax)+'</dd>'+
+    '<dt>your (u₂, u₃)</dt><dd>'+cur[1].toFixed(3)+', '+cur[2].toFixed(3)+'</dd>'+
+    '</dl></div></div>'+
+    '<p class="tiny" style="margin-top:8px">Markers sit at each parameterisation&rsquo;s (u₂, u₃). Chordal and model only appear when their values fall inside this slice&rsquo;s range.</p>';
+}
+
+(function(){
+  var btn=$('landBtn'),cvs=$('landCanvas');
+  if(btn) btn.addEventListener('click',computeLandscape);
+  if(cvs) cvs.addEventListener('click',function(ev){
+    if(!landMeta) return;
+    var r=cvs.getBoundingClientRect();
+    var fx=(ev.clientX-r.left)/r.width, fy=1-(ev.clientY-r.top)/r.height;
+    var u2=landMeta.lo+(landMeta.hi-landMeta.lo)*fx;
+    var u3=landMeta.lo+(landMeta.hi-landMeta.lo)*fy;
+    if(u3<=u2+MINGAP) return;
+    cur=project([landMeta.u1,u2,u3,landMeta.u4]);
+    syncSliders(); refresh(); markPreset(null);
+  });
+})();
+
+/* ═══════════════════════════════════════════════════════════════════
+   7. quadrature figures
+   ═══════════════════════════════════════════════════════════════════ */
+var aliasM=50;
+function drawAlias(){
+  var el=$('aliasChart'); if(!el) return;
+  var W=520,H=270,pad={l:52,r:96,t:16,b:38};
+  var lo=Math.log10(0.05),hi=Math.log10(1e6);
+  function X(t){ return pad.l+t*(W-pad.l-pad.r); }
+  function Y(v){ return (H-pad.b)-(Math.log10(Math.max(v,0.05))-lo)/(hi-lo)*(H-pad.b-pad.t); }
+  var s=svg(W,H,'The curvature integrand with the quadrature sample points overlaid');
+  [0.1,10,1000,100000].forEach(function(g){
+    s+='<line x1="'+pad.l+'" y1="'+E(Y(g))+'" x2="'+(W-pad.r)+'" y2="'+E(Y(g))+
+       '" stroke="hsl(var(--d-grid))" stroke-dasharray="2 3"/>';
+    s+='<text x="'+(pad.l-6)+'" y="'+E(Y(g)+3)+'" text-anchor="end">'+(g<1?g:'1e'+Math.round(Math.log10(g)))+'</text>';
+  });
+  [0,0.25,0.5,0.75,1].forEach(function(t){
+    s+='<text x="'+E(X(t))+'" y="'+(H-20)+'" text-anchor="middle">'+t+'</text>';
+  });
+  s+='<text x="'+E(X(0.5))+'" y="'+(H-6)+'" text-anchor="middle" class="ink">parameter t</text>';
+  s+='<text x="'+(pad.l-6)+'" y="'+(pad.t+2)+'" text-anchor="end" class="ink">κ²·speed</text>';
+
+  REF.forEach(function(r,i){
+    var dense=buildCase(PTS,r.u,1400);
+    var d=dense.samples.map(function(sm,j){ return (j?'L':'M')+E(X(sm.t))+' '+E(Y(sm.integ)); }).join('');
+    s+='<path d="'+d+'" fill="none" stroke="hsl('+r.col+')" stroke-width="1.5" opacity="0.9"/>';
+    var M=aliasM;
+    for(var k=0;k<M;k++){
+      var t=k/(M-1),st=evalAt(r.cas.C,r.cas.U,r.cas.dv,t),kk=kappaAt(st);
+      var v=kk.k*kk.k*kk.speed;
+      s+='<circle cx="'+E(X(t))+'" cy="'+E(Y(v))+'" r="'+(M>400?0.8:2.1)+'" fill="hsl('+r.col+')"/>';
+    }
+    s+='<circle cx="'+(W-88)+'" cy="'+(pad.t+8+i*15)+'" r="4" fill="hsl('+r.col+')"/>';
+    s+='<text x="'+(W-80)+'" y="'+(pad.t+11+i*15)+'">'+r.name+'</text>';
+  });
+  var peak=REF[0].cas.samples.reduce(function(a,b){ return b.integ>a.integ?b:a; });
+  s+='<line x1="'+E(X(0.56975))+'" y1="'+pad.t+'" x2="'+E(X(0.56975))+'" y2="'+(H-pad.b)+
+     '" stroke="hsl(var(--d-bad))" stroke-width="1" stroke-dasharray="3 2" opacity="0.7"/>';
+  s+='<text x="'+E(X(0.56975)+4)+'" y="'+(pad.t+10)+'" class="b" fill="hsl(var(--d-bad))">peak 6.3e5</text>';
+  s+='<text x="'+(W-88)+'" y="'+(pad.t+44)+'">'+aliasM+' samples</text>';
+  s+='<text x="'+(W-88)+'" y="'+(pad.t+57)+'">Δt = '+(1/(aliasM-1)).toFixed(4)+'</text>';
+  s+='<line x1="'+pad.l+'" y1="'+(H-pad.b)+'" x2="'+(W-pad.r)+'" y2="'+(H-pad.b)+'" stroke="hsl(var(--border))"/>';
+  s+='</svg>';
+  el.innerHTML=s;
+}
+
+var CONV_MS=[50,100,200,400,800,1600,3200];
+var CONV=REF.map(function(r){
+  return { name:r.name, col:r.col,
+    vals:CONV_MS.map(function(M){ return energyRepo(r.cas.C,r.cas.U,r.cas.dv,M); }),
+    conv:r.cas.kConv };
+});
+
+(function(){
+  var el=$('convChart');
+  if(el){
+    var W=480,H=250,pad={l:52,r:96,t:16,b:42};
+    var xlo=Math.log10(40),xhi=Math.log10(4200);
+    var ylo=Math.log10(8),yhi=Math.log10(7000);
+    function X(M){ return pad.l+(Math.log10(M)-xlo)/(xhi-xlo)*(W-pad.l-pad.r); }
+    function Y(v){ return (H-pad.b)-(Math.log10(Math.max(v,8))-ylo)/(yhi-ylo)*(H-pad.b-pad.t); }
+    var s=svg(W,H,'Computed energy against quadrature resolution');
+    [10,100,1000,5000].forEach(function(v){
+      s+='<line x1="'+pad.l+'" y1="'+E(Y(v))+'" x2="'+(W-pad.r)+'" y2="'+E(Y(v))+
+         '" stroke="hsl(var(--d-grid))" stroke-dasharray="2 3"/>';
+      s+='<text x="'+(pad.l-6)+'" y="'+E(Y(v)+3)+'" text-anchor="end">'+iFmt(v)+'</text>';
+    });
+    CONV_MS.forEach(function(M){
+      s+='<text x="'+E(X(M))+'" y="'+(H-24)+'" text-anchor="middle">'+M+'</text>';
+    });
+    s+='<text x="'+E(X(400))+'" y="'+(H-8)+'" text-anchor="middle" class="ink">num_pts</text>';
+    [[50,'training'],[100,'eval']].forEach(function(m){
+      s+='<line x1="'+E(X(m[0]))+'" y1="'+pad.t+'" x2="'+E(X(m[0]))+'" y2="'+(H-pad.b)+
+         '" stroke="hsl(var(--d-bad))" stroke-width="1" stroke-dasharray="3 2" opacity="0.75"/>';
+      s+='<text x="'+E(X(m[0])+3)+'" y="'+(pad.t+9)+'" class="b" fill="hsl(var(--d-bad))">'+m[1]+'</text>';
+    });
+    CONV.forEach(function(d,i){
+      s+='<line x1="'+pad.l+'" y1="'+E(Y(d.conv))+'" x2="'+(W-pad.r)+'" y2="'+E(Y(d.conv))+
+         '" stroke="hsl('+d.col+')" stroke-dasharray="5 4" opacity="0.55"/>';
+      var p=d.vals.map(function(v,j){ return (j?'L':'M')+E(X(CONV_MS[j]))+' '+E(Y(v)); }).join('');
+      s+='<path d="'+p+'" fill="none" stroke="hsl('+d.col+')" stroke-width="2"/>';
+      d.vals.forEach(function(v,j){
+        s+='<circle cx="'+E(X(CONV_MS[j]))+'" cy="'+E(Y(v))+'" r="3.4" fill="hsl('+d.col+')"/>';
+      });
+      s+='<circle cx="'+(W-88)+'" cy="'+(pad.t+8+i*26)+'" r="4" fill="hsl('+d.col+')"/>';
+      s+='<text x="'+(W-80)+'" y="'+(pad.t+11+i*26)+'">'+d.name+'</text>';
+      s+='<text x="'+(W-80)+'" y="'+(pad.t+22+i*26)+'">→ '+d.conv.toFixed(1)+'</text>';
+    });
+    s+='<line x1="'+pad.l+'" y1="'+(H-pad.b)+'" x2="'+(W-pad.r)+'" y2="'+(H-pad.b)+'" stroke="hsl(var(--border))"/>';
+    s+='</svg>';
+    el.innerHTML=s;
+  }
+  var t=$('convTable');
+  if(t){
+    var ch=CONV[0],mo=CONV[1];
+    t.innerHTML='<thead><tr><th class="num">num_pts</th><th class="num">Chordal κ</th>'+
+      '<th class="num">Model κ</th><th class="num">Ratio</th><th>Used by</th></tr></thead><tbody>'+
+      CONV_MS.map(function(M,i){
+        var used=M===50?'<span class="badge badge-destructive">N_QUAD · training</span>':
+                 (M===100?'<span class="badge badge-warn">every eval path</span>':'');
+        return '<tr'+(used?' class="flag"':'')+'><td class="num">'+M+'</td>'+
+          '<td class="num">'+kFmt(ch.vals[i])+'</td><td class="num">'+kFmt(mo.vals[i])+'</td>'+
+          '<td class="num">'+(mo.vals[i]/ch.vals[i]).toFixed(4)+'</td><td>'+used+'</td></tr>';
+      }).join('')+
+      '<tr class="total"><td class="num">converged</td><td class="num">'+kFmt(ch.conv)+
+      '</td><td class="num">'+kFmt(mo.conv)+'</td><td class="num">'+(mo.conv/ch.conv).toFixed(4)+
+      '</td><td>the actual integral</td></tr></tbody>';
+  }
+})();
+
+/* ═══════════════════════════════════════════════════════════════════
+   8. lambda tool
+   ═══════════════════════════════════════════════════════════════════ */
+(function(){
+  var el=$('lamChart');
+  if(el){
+    var W=440,H=200,x0=66,y0=H-48,y1=22,vmax=700;
+    function Y(v){ return y0-v/vmax*(y0-y1); }
+    var s=svg(W,H,'Energy reached with and without the buffer box penalty');
+    [0,254,592].forEach(function(g){
+      s+='<line x1="'+x0+'" y1="'+E(Y(g))+'" x2="'+(W-16)+'" y2="'+E(Y(g))+
+         '" stroke="hsl(var(--d-grid))" stroke-dasharray="2 3"/>';
+      s+='<text x="'+(x0-7)+'" y="'+E(Y(g)+3)+'" text-anchor="end">'+g+'</text>';
+    });
+    [{l:'λ = 0',s2:'run 1 · no penalty',v:254,c:'--d-good'},
+     {l:'λ = 200',s2:'run 2 · buffer box',v:592,c:'--d-bad'}].forEach(function(b,i){
+      var cx=x0+86+i*150,bw=70;
+      s+='<rect x="'+(cx-bw/2)+'" y="'+E(Y(b.v))+'" width="'+bw+'" height="'+E(y0-Y(b.v))+
+         '" rx="4" fill="hsl(var('+b.c+'))" opacity="0.9"/>';
+      s+='<text x="'+cx+'" y="'+E(Y(b.v)-7)+'" text-anchor="middle" class="ink b">'+b.v+'</text>';
+      s+='<text x="'+cx+'" y="'+(y0+16)+'" text-anchor="middle" class="ink b">'+b.l+'</text>';
+      s+='<text x="'+cx+'" y="'+(y0+28)+'" text-anchor="middle">'+b.s2+'</text>';
+    });
+    s+='<line x1="'+(x0+86+40)+'" y1="'+(y1+4)+'" x2="'+(x0+236-40)+'" y2="'+(y1+4)+
+       '" stroke="hsl(var(--muted-foreground))" stroke-dasharray="3 3"/>';
+    s+='<text x="'+(x0+161)+'" y="'+(y1-1)+'" text-anchor="middle">no λ measured between</text>';
+    s+='<text x="'+(x0+236+44)+'" y="'+E(Y(592))+'" class="b" fill="hsl(var(--d-bad))">2.3× worse</text>';
+    s+='<line x1="'+x0+'" y1="'+y0+'" x2="'+(W-16)+'" y2="'+y0+'" stroke="hsl(var(--border))"/>';
+    s+='<text x="'+x0+'" y="12" class="ink">energy term only (κ)</text>';
+    s+='</svg>';
+    el.innerHTML=s;
+  }
+
+  var lam=$('lam'),exc=$('exc');
+  if(!lam||!exc) return;
+  var ENERGY=254,SCALE=600;
+  function render(){
+    var L=+lam.value,X=+exc.value,pen=L*X;
+    $('lamOut').textContent=iFmt(L);
+    $('excOut').textContent=X.toFixed(1);
+    $('lamBars').innerHTML=
+      '<div class="bars">'+
+      '<div class="bar"><div class="k">energy</div><div class="track">'+
+        '<div class="fill e" style="width:'+Math.min(100,ENERGY/SCALE*100).toFixed(1)+'%"></div>'+
+        '<div class="num">254</div></div></div>'+
+      '<div class="bar"><div class="k">λ × box</div><div class="track">'+
+        '<div class="fill p" style="width:'+Math.min(100,pen/SCALE*100).toFixed(1)+'%"></div>'+
+        '<div class="num">'+iFmt(pen)+'</div></div></div></div>';
+    var r=pen/ENERGY,cls,msg;
+    if(pen===0){ cls='alert-info'; msg='<strong>Penalty inert.</strong> Either λ is zero or every control point is inside the box. The hinge doing its job — curves already contained are not biased at all.'; }
+    else if(r<0.25){ cls='alert-info'; msg='<strong>Regulariser.</strong> The box costs '+(r*100).toFixed(0)+'% of the energy term. It can steer the model off the inflation strategy without taking over the objective. This is the regime the run should have been in.'; }
+    else if(r<1){ cls='alert-warn'; msg='<strong>Co-objective.</strong> At '+(r*100).toFixed(0)+'% of the energy term the box is a comparable goal rather than a correction. Workable, but expect achievable curvature to rise.'; }
+    else if(r<20){ cls='alert-bad'; msg='<strong>Hard constraint.</strong> The box is '+r.toFixed(1)+'× the energy term. The optimiser sits against the boundary instead of minimising bending. Roughly where run 2 lived: energy stalled at ~592 against 254, real-turn win rate 0.0%.'; }
+    else { cls='alert-bad'; msg='<strong>Energy is noise.</strong> The box is '+iFmt(r)+'× the energy term — curvature has no influence on the gradient at all. A single inflated sample measures Σexcess² = 343.7 on its own, so a batch with a few of them reaches this regime at λ = 200.'; }
+    $('lamVerdict').innerHTML='<div class="alert '+cls+'" style="padding:11px 13px">'+
+      '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>'+
+      '<div><div class="ad"><p>'+msg+'</p></div></div></div>';
+  }
+  lam.addEventListener('input',render);
+  exc.addEventListener('input',render);
+  render();
+})();
+
+/* ═══════════════════════════════════════════════════════════════════
+   9. L-BFGS scatter
+   ═══════════════════════════════════════════════════════════════════ */
+(function(){
+  var el=$('lbfgsChart'); if(!el) return;
+  var W=480,H=340,pad={l:50,r:92,t:16,b:46};
+  var lo=Math.log10(8),hi=Math.log10(5000);
+  function X(v){ return pad.l+(Math.log10(v)-lo)/(hi-lo)*(W-pad.l-pad.r); }
+  function Y(v){ return (H-pad.b)-(Math.log10(v)-lo)/(hi-lo)*(H-pad.b-pad.t); }
+  var s=svg(W,H,'Model curvature against chordal curvature for the ten logged samples');
+  [10,100,1000].forEach(function(t){
+    s+='<line x1="'+E(X(t))+'" y1="'+pad.t+'" x2="'+E(X(t))+'" y2="'+(H-pad.b)+'" stroke="hsl(var(--d-grid))" stroke-dasharray="2 3"/>';
+    s+='<line x1="'+pad.l+'" y1="'+E(Y(t))+'" x2="'+(W-pad.r)+'" y2="'+E(Y(t))+'" stroke="hsl(var(--d-grid))" stroke-dasharray="2 3"/>';
+    s+='<text x="'+E(X(t))+'" y="'+(H-pad.b+14)+'" text-anchor="middle">'+t+'</text>';
+    s+='<text x="'+(pad.l-7)+'" y="'+E(Y(t)+3)+'" text-anchor="end">'+t+'</text>';
+  });
+  s+='<line x1="'+E(X(8))+'" y1="'+E(Y(8))+'" x2="'+E(X(5000))+'" y2="'+E(Y(5000))+'" stroke="hsl(var(--muted-foreground))" stroke-width="1.4"/>';
+  s+='<text x="'+E(X(1300)+5)+'" y="'+E(Y(1300)-6)+'">parity</text>';
+  s+='<text x="'+E(X(11))+'" y="'+E(Y(1100))+'" class="b" fill="hsl(var(--d-good))">model wins below</text>';
+  LBFGS.forEach(function(d){
+    if(Math.abs(d.refined-d.model)/d.model>0.01)
+      s+='<line x1="'+E(X(d.chord))+'" y1="'+E(Y(d.model))+'" x2="'+E(X(d.chord))+'" y2="'+E(Y(d.refined))+
+         '" stroke="hsl(var(--d-good))" stroke-width="3.5" opacity="0.4"/>';
+  });
+  LBFGS.forEach(function(d){
+    var win=d.model<d.chord;
+    s+='<circle cx="'+E(X(d.chord))+'" cy="'+E(Y(d.model))+'" r="5.5" fill="hsl(var('+(win?'--d-good':'--d-bad')+'))" opacity="0.92"/>';
+    if(!win){
+      s+='<text x="'+E(X(d.chord)+10)+'" y="'+E(Y(d.model)-4)+'" class="b" fill="hsl(var(--d-bad))">sample '+d.i+'</text>';
+      s+='<text x="'+E(X(d.chord)+10)+'" y="'+E(Y(d.model)+8)+'">κ '+d.model.toFixed(0)+' vs '+d.chord.toFixed(0)+'</text>';
+    }
+  });
+  s+='<text x="'+E((pad.l+W-pad.r)/2)+'" y="'+(H-8)+'" text-anchor="middle" class="ink">chordal κ (log)</text>';
+  var my=(pad.t+H-pad.b)/2;
+  s+='<text x="13" y="'+my+'" text-anchor="middle" class="ink" transform="rotate(-90 13 '+my+')">model κ (log)</text>';
+  s+='<circle cx="'+(W-84)+'" cy="'+(pad.t+8)+'" r="5" fill="hsl(var(--d-good))"/><text x="'+(W-74)+'" y="'+(pad.t+11)+'">beats chordal</text>';
+  s+='<circle cx="'+(W-84)+'" cy="'+(pad.t+24)+'" r="5" fill="hsl(var(--d-bad))"/><text x="'+(W-74)+'" y="'+(pad.t+27)+'">loses</text>';
+  s+='<line x1="'+(W-89)+'" y1="'+(pad.t+40)+'" x2="'+(W-79)+'" y2="'+(pad.t+40)+'" stroke="hsl(var(--d-good))" stroke-width="3.5" opacity="0.4"/>';
+  s+='<text x="'+(W-74)+'" y="'+(pad.t+43)+'">L-BFGS moved it</text>';
+  s+='</svg>';
+  el.innerHTML=s;
+})();
+
+/* ═══════════════════════════════════════════════════════════════════
+   10. boot + theme
+   ═══════════════════════════════════════════════════════════════════ */
+(function(){
+  var st=$('statDof'); if(st) st.textContent='3 of 4';
+  markPreset('model');
+  refresh();
+  drawAlias();
+  markLandStale(true);
+  setTimeout(computeLandscape,120);
+
+  function onTheme(){ paintLandscape(); drawLandMarkers(); }
+  if(window.matchMedia){
+    var mq=window.matchMedia('(prefers-color-scheme: dark)');
+    if(mq.addEventListener) mq.addEventListener('change',onTheme);
+  }
+  if(window.MutationObserver){
+    new MutationObserver(onTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+  }
+})();
+</script>
+
+
+</body>
+</html>

@@ -123,7 +123,9 @@ KnotTransformer/
 ├── web/                                ← interactive visualizations
 │   ├── transformer_deep_dive.html      ← full transformer mechanics (matrices, attention)
 │   ├── knot_transformer_pipeline.html  ← 5-step pipeline walkthrough
-│   └── knot_transformer_explainer.html ← B-spline + curvature interactive demo
+│   ├── knot_transformer_explainer.html ← B-spline + curvature interactive demo
+│   ├── knot_transformer_internals.html ← full teardown; runs a port of the solver live
+│   └── knot_transformer_internals_v1.html ← earlier design of the same page
 │
 ├── docs/                               ← documentation
 │   └── SETUP.md                        ← environment setup guide
@@ -183,6 +185,8 @@ Open any of these HTML files directly in your browser — no server needed:
 | `web/transformer_deep_dive.html` | **Every matrix multiply** in the attention mechanism — Q, K, V projections, scores, softmax, weighted sum. Clickable cells show exact dot-product computations. Interactive multi-head and layer-stacking diagrams. |
 | `web/knot_transformer_pipeline.html` | **5-step pipeline walkthrough** — input tokenization, encoder self-attention, decoder cross-attention, knot head output, full gradient chain. Click tokens to see attention patterns. |
 | `web/knot_transformer_explainer.html` | **B-spline fundamentals** — drag knot sliders to reshape the curve through fixed points. See control points move, curvature change. Presets for uniform/chordal/optimized. |
+| `web/knot_transformer_internals.html` | **Full teardown** — class map, parameter budget, dataflow, and a live port of `curvature_layer_nd.py` that reproduces the notebook's energies to five figures. Drag the knots on the real cell-42 sample, walk the energy landscape, and see the quadrature grid step over the integrand's spike. Also records the four defects in [`experiments/quadrature/README.md`](experiments/quadrature/README.md). |
+| `web/knot_transformer_internals_v1.html` | Earlier design of the same page — same numbers, static figures, no explorer. Kept for comparison. |
 
 ---
 
