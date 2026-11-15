@@ -533,7 +533,7 @@ class Phase2TrainerND:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    from curvature_layer_nd import (
+    from Curvature_Minimiser import (
         solve_nd, global_curvature_nd, arc_nd,
         chordal_nd, centripetal_nd,
     )

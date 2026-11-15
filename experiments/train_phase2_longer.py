@@ -44,7 +44,7 @@ from torch.utils.data import DataLoader
 from knot_transformer import (
     KnotTransformer, BSplineDataset, collate_variable_length, device,
 )
-import curvature_layer_nd as cl
+import Curvature_Minimiser as cl
 
 # Re-use helpers from earlier scripts
 from generalization_experiment import (

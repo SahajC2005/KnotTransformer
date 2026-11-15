@@ -1,0 +1,26 @@
+{
+  "dof2": {
+    "n_dof": 2,
+    "n_valid": 500,
+    "acc": 0.934,
+    "median_model": 45.826493809960354,
+    "median_chordal": 2417.5108039463366,
+    "mean_knot_l1": 0.2691459143294652
+  },
+  "dof3": {
+    "n_dof": 3,
+    "n_valid": 500,
+    "acc": 0.928,
+    "median_model": 127.5864129305962,
+    "median_chordal": 2191.5668720296608,
+    "mean_knot_l1": 0.22728021801530662
+  },
+  "dof4": {
+    "n_dof": 4,
+    "n_valid": 500,
+    "acc": 0.908,
+    "median_model": 141.8420099088524,
+    "median_chordal": 2532.295276133199,
+    "mean_knot_l1": 0.2292624742703719
+  }
+}

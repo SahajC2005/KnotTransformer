@@ -1,14 +1,19 @@
 """
-KnotTransformer — A unified transformer model for B-spline knot parameterisation.
+KnotTransformer — A  transformer model for B-spline knot parameterisation.
+This was adapted from Nuerel Net models for B-Spline knot prediction by Vinaik Chhetri.
 
 Replaces separate MLP models for 2/3/4 dof with a single sequence-to-sequence
 transformer that handles variable-length point sequences and variable knot counts.
 
 Training is two-phase (matching the existing self-supervised pipeline):
   Phase 1: Pretrain against heuristic knots (chordal for curvature, centripetal
-            for arc length) using L1 loss.
+            for arc length) using L1 loss. This method is fast and gives a good 
+            starting point for the model, also known as a warm start.
+
   Phase 2: Fine-tune directly against the B-spline energy (curvature or arc
-            length) using the differentiable curvatureLayer functions.
+            length) using the differentiable curvatureLayer functions. This adapts
+            B-spline knots to specific point sequences and gives better performance 
+            than the heuristic.
 
 Usage:
     from knot_transformer import KnotTransformer, Phase1Trainer, Phase2Trainer
@@ -30,12 +35,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ---------------------------------------------------------------------------
 # Feature Engineering
 # ---------------------------------------------------------------------------
-
-def compute_geometric_features(points: torch.Tensor) -> torch.Tensor:
-    """
-    Compute rotation- and scale-invariant geometric features for a batch of
-    point sequences. Mirrors the hand-crafted features used in the existing
-    MLP notebooks.
+"""
+    Compute rotation - and scale-invariant geometric features for a batch of
+    point sequences. The model is trying to learn the shape rather than precise location
+    as when the points are normalised and the rotations are removed, the model can focus on t
+    he shape of the curve rather than the specific coordinates of the points.
+    This method is used through the pipeline to compute the hand-crafted features used in the existing MLP notebooks.
 
     Args:
         points: (B, N, 2)  — batch of N 2-D points each
@@ -46,7 +51,10 @@ def compute_geometric_features(points: torch.Tensor) -> torch.Tensor:
             [1] local segment length fraction
             [2] turning angle at point i (normalised to [0,1])
             [3] cumulative centripetal fraction up to point i
-    """
+"""
+
+def compute_geometric_features(points: torch.Tensor) -> torch.Tensor:
+   
     B, N, _ = points.shape
 
     # Segment lengths — chordal and centripetal

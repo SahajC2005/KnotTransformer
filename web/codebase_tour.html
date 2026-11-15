@@ -1,0 +1,735 @@
+<meta charset="utf-8">
+<title>KnotTransformer Codebase Tour</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: one reading column (72ch) with wider figure bands; sticky chip nav; the live spline bench opens the page. */
+:root{
+  --bg:#f5f7fb; --surface:#ffffff; --sunken:#ebeff6; --ink:#131f38; --muted:#55627a; --line:#d3dbe8;
+  --accent:#1f4fd8; --accent-soft:#e2e9fc; --hot:#bf2f6c; --hot-soft:#fbe6ef; --good:#0d7a5d; --warn:#9a5a00; --warn-soft:#fdf1dc;
+  --display:"Space Grotesk","IBM Plex Sans",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d1422; --surface:#151f34; --sunken:#101a2c; --ink:#e7ecf7; --muted:#9ba9c1; --line:#2a3855;
+  --accent:#82a6ff; --accent-soft:#1b2a52; --hot:#ff86b4; --hot-soft:#3a1a2b; --good:#52d3a7; --warn:#f1b65a; --warn-soft:#33270f; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0d1422; --surface:#151f34; --sunken:#101a2c; --ink:#e7ecf7; --muted:#9ba9c1; --line:#2a3855;
+  --accent:#82a6ff; --accent-soft:#1b2a52; --hot:#ff86b4; --hot-soft:#3a1a2b; --good:#52d3a7; --warn:#f1b65a; --warn-soft:#33270f; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1060px;margin:0 auto;padding-block:28px 80px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.col{max-width:72ch}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;line-height:1.15;margin:0}
+h1{font-size:clamp(2rem,5vw,3.1rem);font-weight:700;letter-spacing:-0.02em}
+h2{font-size:clamp(1.45rem,3vw,1.9rem);font-weight:600;letter-spacing:-0.01em}
+h3{font-size:1.08rem;font-weight:600}
+p{margin:0}
+section{display:flex;flex-direction:column;gap:18px;padding-top:56px;scroll-margin-top:56px}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.lede{font-size:1.13rem;color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.88em}
+p code,li code,td code{background:var(--sunken);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+nav.chips{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bg);border-bottom:1px solid var(--line);margin-top:22px}
+nav.chips div{display:flex;gap:6px;overflow-x:auto;padding:9px 0}
+nav.chips a{flex:none;font-size:.84rem;text-decoration:none;color:var(--muted);padding:4px 10px;border-radius:999px;border:1px solid transparent}
+nav.chips a:hover{color:var(--ink);border-color:var(--line)}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.scroll{overflow-x:auto}
+pre{margin:0;background:var(--sunken);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:.8rem;line-height:1.55}
+pre .c{color:var(--muted)} pre .k{color:var(--accent)} pre .h{color:var(--hot)}
+figcaption,.cap{font-size:.86rem;color:var(--muted)}
+figure{margin:0;display:flex;flex-direction:column;gap:8px}
+
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:500;white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+
+/* bench */
+.bench{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:0;overflow:hidden}
+.bench canvas{display:block;width:100%;aspect-ratio:4/3;touch-action:none;cursor:grab;background:var(--surface)}
+.bench .side{padding:16px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:14px;min-width:0}
+@media (max-width:760px){.bench{grid-template-columns:minmax(0,1fr)}.bench .side{border-left:0;border-top:1px solid var(--line)}}
+.btns{display:flex;flex-wrap:wrap;gap:6px}
+button,select{font:inherit;font-size:.85rem;color:var(--ink);background:var(--sunken);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button.go{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.slid{display:grid;grid-template-columns:2.4em minmax(0,1fr) 3.4em;align-items:center;gap:8px;font-family:var(--mono);font-size:.8rem}
+.slid input{width:100%;accent-color:var(--accent);min-width:0}
+.slid output{text-align:right;font-variant-numeric:tabular-nums}
+.read{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:.88rem;font-variant-numeric:tabular-nums}
+.read b{font-family:var(--mono);font-weight:500}
+.pill{display:inline-block;font-family:var(--mono);font-size:.74rem;padding:2px 8px;border-radius:999px;border:1px solid currentColor}
+.pill.good{color:var(--good)} .pill.bad{color:var(--hot)} .pill.warn{color:var(--warn)} .pill.info{color:var(--accent)}
+
+/* architecture svg */
+.arch svg{display:block;min-width:900px;width:100%;height:auto}
+.arch .bx{fill:var(--surface);stroke:var(--line);stroke-width:1.2}
+.arch .enc{stroke:var(--accent)} .arch .dec{stroke:var(--good)} .arch .geo{stroke:var(--hot)}
+.arch .dash{stroke-dasharray:5 4}
+.arch .t{font-family:var(--display);font-size:13.5px;font-weight:600;fill:var(--ink);text-anchor:middle}
+.arch .s{font-family:var(--mono);font-size:10.5px;fill:var(--muted);text-anchor:middle}
+.arch .lane{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;fill:var(--muted)}
+.arch .lane.e{fill:var(--accent)} .arch .lane.d{fill:var(--good)} .arch .lane.g{fill:var(--hot)}
+.arch .ar{stroke:var(--muted);stroke-width:1.4;fill:none}
+.arch .gr{stroke:var(--hot);stroke-width:1.4;fill:none;stroke-dasharray:6 4}
+.arch .ah{fill:var(--muted)} .arch .gh{fill:var(--hot)}
+.arch .note{font-family:var(--mono);font-size:10.5px;fill:var(--ink)}
+
+.bars{display:flex;flex-direction:column;gap:7px}
+.bar{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr) 6.2em;gap:10px;align-items:center;font-size:.87rem}
+.bar .track{height:14px;background:var(--sunken);border-radius:3px;position:relative;overflow:hidden}
+.bar .fill{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:3px}
+.bar .fill.d{background:var(--good)} .bar .fill.h{background:var(--hot)} .bar .fill.m{background:var(--muted)}
+.bar .mark{position:absolute;top:0;bottom:0;width:1px;background:var(--ink);opacity:.55}
+.bar .v{font-family:var(--mono);font-size:.8rem;text-align:right;font-variant-numeric:tabular-nums}
+
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.two>*{min-width:0}
+.card{padding:18px;display:flex;flex-direction:column;gap:10px}
+.card ul,.col ul,.col ol{margin:0;padding-left:1.15em;display:flex;flex-direction:column;gap:6px}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;font-size:.88rem}
+.kv dt{font-family:var(--mono);font-size:.78rem;color:var(--muted)} .kv dd{margin:0}
+.callout{border:1px solid var(--warn);background:var(--warn-soft);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;font-size:.93rem}
+.callout h3{color:var(--warn)}
+.ruler{position:relative;height:34px;border-bottom:2px solid var(--ink);margin:6px 8px 20px}
+.ruler i{position:absolute;bottom:-7px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--accent);border:2px solid var(--surface)}
+.ruler i.pin{background:var(--hot)}
+.ruler span{position:absolute;bottom:-24px;font-family:var(--mono);font-size:.7rem;color:var(--muted);transform:translateX(-50%)}
+.eq{font-family:var(--mono);font-size:.92rem;background:var(--sunken);border-radius:8px;padding:12px 16px;overflow-x:auto;white-space:nowrap}
+footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--line);font-size:.84rem;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="wrap">
+
+<header class="col" style="display:flex;flex-direction:column;gap:14px">
+  <span class="eyebrow">Codebase tour · KnotTransformer</span>
+  <h1>A transformer that chooses where a spline spends its time</h1>
+  <p class="lede">Any ordered set of waypoints has infinitely many cubic B-splines through it. The only free choice is the knot vector, and one choice bends least. This repo trains a DETR-style encoder–decoder to pick those knots in a single forward pass, graded by the curve's own bending energy. This page walks through the files, the three model variants, the training loops, and exactly which parts of DETR survived the trip.</p>
+</header>
+
+<nav class="chips" aria-label="Sections"><div>
+  <a href="#bench">Spline bench</a><a href="#files">File map</a><a href="#arch">Architecture</a><a href="#head">Output head</a><a href="#detr">DETR link</a><a href="#variants">2D / nD / 3D</a><a href="#training">Training</a><a href="#geometry">Geometry layer</a><a href="#results">Results</a><a href="#drift">Docs vs code</a>
+</div></nav>
+
+<!-- ===================== BENCH ===================== -->
+<section id="bench">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">The problem, live</span>
+    <h2>Move the knots, watch the energy</h2>
+    <p>This bench reimplements the repo's geometry layer in JavaScript: the same clamped cubic knot vector, the same natural end conditions from <code>construct_A</code>, the same energy <span class="mono" style="white-space:nowrap">E = ∫ κ² ‖C′‖ dt</span>. Drag the black waypoints or the knot sliders. Every knot setting still passes through every point; only the bending changes. That number is the Phase 2 training loss.</p>
+  </div>
+  <div class="panel bench">
+    <canvas id="cv" aria-label="Interactive B-spline through draggable waypoints"></canvas>
+    <div class="side">
+      <div class="btns" role="group" aria-label="Knot presets">
+        <button id="p-chordal" aria-pressed="true">Chordal</button>
+        <button id="p-centripetal" aria-pressed="false">Centripetal</button>
+        <button id="p-uniform" aria-pressed="false">Uniform</button>
+        <button id="p-opt" class="go">Minimise energy</button>
+      </div>
+      <div id="sliders" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div class="read">
+        <span>Bending energy, these knots</span><b id="e-cur">–</b>
+        <span>Bending energy, chordal</span><b id="e-chord">–</b>
+        <span>Ratio (what the repo reports)</span><b id="e-ratio">–</b>
+      </div>
+      <div><span id="verdict" class="pill info">–</span></div>
+      <div class="btns">
+        <label class="mono" for="sel-n" style="align-self:center;font-size:.8rem">N =</label>
+        <select id="sel-n"><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option></select>
+        <button id="b-rand">Random points</button>
+        <button id="b-comb" aria-pressed="true">Curvature comb</button>
+      </div>
+      <p class="cap">"Minimise energy" runs a coordinate search in your browser. It stands in for the trained model, whose checkpoints live on Google Drive and are not in the repo. Random points are drawn from U(−0.5, 0.5)², the training distribution.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FILES ===================== -->
+<section id="files">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">File map</span>
+    <h2>Where each job lives</h2>
+    <p>Three files do the real work: one model file, one geometry file, one training script. The rest are variants, data generators, analysis, and Colab notebooks that wrap the same functions.</p>
+  </div>
+  <div class="panel scroll"><table>
+    <thead><tr><th>File</th><th class="n">Lines</th><th>Role</th><th>Key symbols</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/knot_transformer.py</code></td><td class="n">741</td><td><b>The model used in every reported result.</b> 2D features, dataset and padding collate, the encoder–decoder, both trainer classes.</td><td><code>compute_geometric_features</code>, <code>KnotTransformer</code>, <code>Phase1Trainer</code>, <code>Phase2Trainer</code>, <code>collate_variable_length</code></td></tr>
+      <tr><td><code>src/curvature_layer_nd.py</code></td><td class="n">494</td><td><b>Differentiable geometry.</b> Builds the collocation matrix, solves for control points, integrates curvature. This is the loss function.</td><td><code>construct_A</code>, <code>solve_nd</code>, <code>de_boor</code>, <code>global_curvature_nd</code>, <code>chordal_nd</code></td></tr>
+      <tr><td><code>experiments/train_phase2_longer.py</code></td><td class="n">306</td><td><b>The Phase 2 loop that produced the checkpoints.</b> N-grouped batched solve, energy cap, held-out checkpoint selection, resumable in chunks.</td><td><code>train_one_epoch</code>, <code>rescale_interior</code>, <code>evaluate_holdout</code></td></tr>
+      <tr><td><code>src/generalization_experiment.py</code></td><td class="n">332</td><td>Phase 1 run plus the evaluation harness every other script imports. Trains on N∈{4,5}, tests on N=6.</td><td><code>gen_random_points</code>, <code>evaluate_on_test_set</code>, <code>rescale_knots_to_interior</code></td></tr>
+      <tr><td><code>experiments/evaluate_phase2_final.py</code></td><td class="n">62</td><td>Rebuilds the three 500-sample test sets from the seed and scores the best-by-held-out checkpoint.</td><td>–</td></tr>
+      <tr><td><code>src/knot_transformer_nd.py</code></td><td class="n">584</td><td>Same model with a <code>spatial_dim</code> argument and matching nD trainers.</td><td><code>KnotTransformerND</code>, <code>collate_nd</code></td></tr>
+      <tr><td><code>src/knot_transformer_3d.py</code></td><td class="n">172</td><td>Leaner d-dimensional rewrite with a 2D→3D weight-transfer loader.</td><td><code>KnotTransformer3D</code>, <code>warm_start_from</code></td></tr>
+      <tr><td><code>src/bspline3d.py</code></td><td class="n">276</td><td>Second, pure-PyTorch B-spline implementation with a batched bending energy. Backs the interactive explorer.</td><td><code>solve_control_points</code>, <code>bending_energy_batch</code></td></tr>
+      <tr><td><code>src/road_generator.py</code></td><td class="n">141</td><td>Synthetic approach → bend → exit waypoints with GPS-style jitter, for real-turn transfer.</td><td><code>make_road_path</code>, <code>gen_road_points</code></td></tr>
+      <tr><td><code>src/losses.py</code></td><td class="n">41</td><td>Buffer-box penalty that keeps control points near the data. Recorded as a negative result.</td><td><code>buffer_box_penalty</code></td></tr>
+      <tr><td><code>src/interpretability.py</code></td><td class="n">731</td><td>Five probes: cross-attention maps, linear probing of encoder states, attention ablation, knot sensitivity, latent geometry.</td><td><code>attention_map_analysis</code>, <code>encoder_probing</code>, <code>attention_ablation</code></td></tr>
+      <tr><td><code>src/curvatureLayer.py</code></td><td class="n">23</td><td>Re-export shim so thesis-era imports keep working.</td><td>–</td></tr>
+      <tr><td><code>notebooks/*.ipynb</code></td><td class="n">7</td><td>Colab wrappers. <code>CompleteKnotTransformer_V2</code> is the GPU version of the training script (300 epochs, batch 128). The three <code>Phase2_*</code> notebooks add multi-seed evals, L-BFGS analysis, and road fine-tuning.</td><td>–</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===================== ARCH ===================== -->
+<section id="arch">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Architecture</span>
+    <h2>Points in, ordered knots out</h2>
+    <p>The forward pass in <code>KnotTransformer.forward</code> (knot_transformer.py:236) is three lanes. The encoder reads the waypoints. The decoder asks six fixed questions of what the encoder wrote. During Phase 2 a third lane turns the answers into a curve and measures it.</p>
+  </div>
+  <figure class="panel arch scroll" style="padding:14px">
+    <svg viewBox="0 0 984 470" role="img" aria-label="KnotTransformer data flow: encoder path, decoder path, differentiable geometry lane">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0L10 5L0 10z"/></marker>
+        <marker id="gh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="gh" d="M0 0L10 5L0 10z"/></marker>
+      </defs>
+      <text class="lane e" x="12" y="30">ENCODER PATH · READS THE WAYPOINTS</text>
+      <g><rect class="bx enc" x="12" y="44" width="176" height="66" rx="7"/><text class="t" x="100" y="66">Waypoints</text><text class="s" x="100" y="83">points (B, N, 2)</text><text class="s" x="100" y="98">N = 4…10, padded + mask</text></g>
+      <g><rect class="bx enc" x="208" y="44" width="176" height="66" rx="7"/><text class="t" x="296" y="66">Geometric features</text><text class="s" x="296" y="83">chord cum, local frac,</text><text class="s" x="296" y="98">angle, centripetal cum</text></g>
+      <g><rect class="bx enc" x="404" y="44" width="176" height="66" rx="7"/><text class="t" x="492" y="66">Project + position</text><text class="s" x="492" y="83">Linear(6 → 64)</text><text class="s" x="492" y="98">+ Embedding(10, 64)</text></g>
+      <g><rect class="bx enc" x="600" y="44" width="176" height="66" rx="7"/><text class="t" x="688" y="66">Encoder × 3</text><text class="s" x="688" y="83">self-attention, 4 heads</text><text class="s" x="688" y="98">FFN 64 → 256 → 64</text></g>
+      <path class="ar" marker-end="url(#ah)" d="M188 77H206"/><path class="ar" marker-end="url(#ah)" d="M384 77H402"/><path class="ar" marker-end="url(#ah)" d="M580 77H598"/>
+      <path class="ar" marker-end="url(#ah)" d="M688 110V188"/><text class="note" x="698" y="146">memory (B, N, 64)</text>
+
+      <text class="lane d" x="12" y="176">DECODER PATH · READS OUT KNOTS (RIGHT TO LEFT)</text>
+      <g><rect class="bx dec" x="796" y="190" width="176" height="66" rx="7"/><text class="t" x="884" y="212">Knot queries</text><text class="s" x="884" y="229">Embedding(6, 64)</text><text class="s" x="884" y="244">learned constants</text></g>
+      <g><rect class="bx dec" x="600" y="190" width="176" height="66" rx="7"/><text class="t" x="688" y="212">Decoder × 3</text><text class="s" x="688" y="229">self-attn over queries</text><text class="s" x="688" y="244">cross-attn to memory</text></g>
+      <g><rect class="bx dec" x="404" y="190" width="176" height="66" rx="7"/><text class="t" x="492" y="212">Knot head</text><text class="s" x="492" y="229">Linear 64 → 32, GELU</text><text class="s" x="492" y="244">Linear 32 → 1, raw r</text></g>
+      <g><rect class="bx dec" x="208" y="190" width="176" height="66" rx="7"/><text class="t" x="296" y="212">Monotonic map</text><text class="s" x="296" y="229">softplus → cumsum</text><text class="s" x="296" y="244">÷ cum[K−1], keep first K</text></g>
+      <g><rect class="bx dec" x="12" y="190" width="176" height="66" rx="7"/><text class="t" x="100" y="212">Interior knots</text><text class="s" x="100" y="229">u1 &lt; u2 &lt; … &lt; uK</text><text class="s" x="100" y="244">(B, 6), K = N − 2</text></g>
+      <path class="ar" marker-end="url(#ah)" d="M796 223H778"/><path class="ar" marker-end="url(#ah)" d="M600 223H582"/><path class="ar" marker-end="url(#ah)" d="M404 223H386"/><path class="ar" marker-end="url(#ah)" d="M208 223H190"/>
+      <path class="ar" marker-end="url(#ah)" d="M100 256V334"/>
+
+      <text class="lane g" x="120" y="322">DIFFERENTIABLE GEOMETRY · PHASE 2 LOSS</text>
+      <g><rect class="bx geo" x="12" y="336" width="176" height="66" rx="7"/><text class="t" x="100" y="358">Clamped knot vector</text><text class="s" x="100" y="375">rescale to [0.02, 0.98]</text><text class="s" x="100" y="390">[0,0,0,0, u, 1,1,1,1]</text></g>
+      <g><rect class="bx geo" x="208" y="336" width="176" height="66" rx="7"/><text class="t" x="296" y="358">Linear solve</text><text class="s" x="296" y="375">A(u) P = D</text><text class="s" x="296" y="390">N + 2 control points</text></g>
+      <g><rect class="bx geo" x="404" y="336" width="176" height="66" rx="7"/><text class="t" x="492" y="358">Bending energy</text><text class="s" x="492" y="375">E = ∫ κ² ‖C′‖ dt</text><text class="s" x="492" y="390">Simpson, 100 samples</text></g>
+      <g><rect class="bx geo" x="600" y="336" width="176" height="66" rx="7"/><text class="t" x="688" y="358">Phase 2 loss</text><text class="s" x="688" y="375">mean of min(E, 1000)</text><text class="s" x="688" y="390">batched per length N</text></g>
+      <g><rect class="bx dash" x="796" y="336" width="176" height="66" rx="7"/><text class="t" x="884" y="358">Phase 1 loss</text><text class="s" x="884" y="375">L1(u, chordal knots)</text><text class="s" x="884" y="390">skips the geometry lane</text></g>
+      <path class="ar" marker-end="url(#ah)" d="M188 369H206"/><path class="ar" marker-end="url(#ah)" d="M384 369H402"/><path class="ar" marker-end="url(#ah)" d="M580 369H598"/>
+      <path class="gr" marker-end="url(#gh)" d="M688 402V432H100V406"/>
+      <text class="note" x="394" y="452" text-anchor="middle">backprop: loss → energy → A⁻¹ → knots → head → decoder → encoder</text>
+    </svg>
+    <figcaption>Shapes are for the 2D model with default hyperparameters. The decoder lane is drawn right to left so the encoder's memory can drop straight into it.</figcaption>
+  </figure>
+
+  <div class="two">
+    <div class="panel card">
+      <h3>What each waypoint token contains</h3>
+      <p class="cap">Built in <code>compute_geometric_features</code>, concatenated with raw (x, y), then lifted by <code>Linear(6, 64)</code>.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Feature</th><th>Why it helps</th></tr></thead>
+        <tbody>
+          <tr><td class="n">0–1</td><td>x, y</td><td>Raw position in the [−0.5, 0.5]² box.</td></tr>
+          <tr><td class="n">2</td><td>Cumulative chord fraction</td><td>This <i>is</i> the chordal knot for that point. Phase 1's target is sitting in the input.</td></tr>
+          <tr><td class="n">3</td><td>Local segment fraction</td><td>Length of the incoming segment over total length.</td></tr>
+          <tr><td class="n">4</td><td>Turning angle</td><td>Signed atan2 of consecutive edges, mapped to [0, 1]. Zero at the two ends.</td></tr>
+          <tr><td class="n">5</td><td>Cumulative centripetal fraction</td><td>Same idea with √length, the classic alternative heuristic.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <div class="panel card">
+      <h3>Where the 353,793 parameters sit</h3>
+      <p class="cap">Counted by instantiating <code>KnotTransformer()</code> from the repo. 99% of the weights are attention and feed-forward blocks.</p>
+      <div class="bars">
+        <div class="bar"><span>Decoder × 3</span><div class="track"><div class="fill d" style="width:100%"></div></div><span class="v">200,256</span></div>
+        <div class="bar"><span>Encoder × 3</span><div class="track"><div class="fill" style="width:74.9%"></div></div><span class="v">149,952</span></div>
+        <div class="bar"><span>Knot head</span><div class="track"><div class="fill d" style="width:1.1%"></div></div><span class="v">2,113</span></div>
+        <div class="bar"><span>Position embedding</span><div class="track"><div class="fill" style="width:.4%"></div></div><span class="v">640</span></div>
+        <div class="bar"><span>Input projection</span><div class="track"><div class="fill" style="width:.3%"></div></div><span class="v">448</span></div>
+        <div class="bar"><span>Knot queries (6 × 64)</span><div class="track"><div class="fill d" style="width:.2%"></div></div><span class="v">384</span></div>
+      </div>
+      <dl class="kv">
+        <dt>d_model</dt><dd>64, four heads of 16</dd>
+        <dt>layers</dt><dd>3 encoder + 3 decoder, post-norm, dropout 0.1</dd>
+        <dt>FFN</dt><dd>64 → 256 → 64, ReLU (PyTorch default)</dd>
+        <dt>precision</dt><dd>float64 everywhere, via <code>self.double()</code></dd>
+        <dt>limits</dt><dd>10 points, 6 knots, so N ≤ 8 in practice</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <h3>Three details that are easy to miss</h3>
+    <ul>
+      <li><b>The decoder is never told K.</b> <code>num_knots</code> is used only after the head, to choose which cumulative sum to divide by. All six queries always run. The network has to infer how many knots are needed from how many unmasked points it sees.</li>
+      <li><b>Unused queries still take part.</b> No <code>tgt_key_padding_mask</code> is passed, so queries beyond K join decoder self-attention even though their outputs are discarded.</li>
+      <li><b>Padding is handled twice.</b> <code>point_mask</code> goes to the encoder as <code>src_key_padding_mask</code> and to the decoder's cross-attention as <code>memory_key_padding_mask</code>. That pair is the whole variable-length mechanism on the input side.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== HEAD ===================== -->
+<section id="head">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Output head</span>
+    <h2>How six scores become a sorted knot vector</h2>
+    <p>Knots must be strictly increasing and inside (0, 1). Rather than sort or penalise, the head makes disorder impossible: each query emits a raw score, softplus makes it a positive gap, a running sum stacks the gaps, and dividing by the K-th sum normalises. Try it. Whatever you do to the sliders, the K-th knot lands on exactly 1.</p>
+  </div>
+  <div class="panel card">
+    <div class="btns"><label class="mono" for="head-k" style="align-self:center;font-size:.8rem">K (knots needed) =</label>
+      <select id="head-k"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select></div>
+    <div class="two">
+      <div id="head-sl" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div class="scroll"><table id="head-tb">
+        <thead><tr><th>Query</th><th class="n">raw r</th><th class="n">softplus</th><th class="n">cumsum</th><th class="n">knot u</th><th class="n">rescaled</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+    <div class="ruler" id="head-ruler" aria-hidden="true"></div>
+    <p class="cap">Blue dots are free knots. The pink dot is the K-th, pinned to 1.0 by <code>cum[K−1] / cum[K−1]</code>. Left alone it would collide with the four clamped end knots and make the solve singular, so every training and evaluation path applies <code>0.02 + 0.96·u</code> first. The model therefore controls K−1 knots; the last always sits at 0.98.</p>
+  </div>
+  <pre><span class="c"># src/knot_transformer.py:274</span>
+raw        = self.knot_head(decoded).squeeze(-1)     <span class="c"># (B, 6)</span>
+increments = F.softplus(raw) + 1e-6                  <span class="c"># strictly positive gaps</span>
+cum        = torch.cumsum(increments, dim=-1)        <span class="c"># strictly increasing</span>
+<span class="k">for</span> b <span class="k">in</span> range(B):
+    K = num_knots[b].item()
+    knot_vals[b, :K] = cum[b, :K] / (cum[b, K - 1] + 1e-8)   <span class="h"># K-th knot == 1.0</span></pre>
+  <p class="col cap">experiments/REPORT.md records the attempted fix: predict K+1 gaps and divide by the (K+1)-th sum. That version collapsed to uniform spacing, so the pinned head plus rescaling stayed.</p>
+</section>
+
+<!-- ===================== DETR ===================== -->
+<section id="detr">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">The DETR link</span>
+    <h2>What DETR was for, and what this repo took from it</h2>
+    <p>DETR (Carion et al., 2020, "End-to-End Object Detection with Transformers") reframed object detection as direct set prediction. A CNN turns the image into a grid of features, a transformer encoder lets every location see every other, and a decoder holds 100 learned <i>object queries</i>. Each query attends to the encoded image and emits one box and one class, all in parallel. That removed anchors and non-maximum suppression from the detection pipeline.</p>
+    <p>The idea worth stealing is the query. A query is a learned vector that means "slot i of the answer". It carries no input content; it gets content by cross-attending to the encoder. Because the number of slots is fixed and decoding is parallel, the model emits a variable-size answer without generating tokens one at a time. KnotTransformer needs exactly that: N points in, N−2 numbers out, N changing from sample to sample.</p>
+  </div>
+
+  <div class="panel scroll"><table>
+    <thead><tr><th>Piece</th><th>DETR (object detection)</th><th>KnotTransformer (this repo)</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Input tokens</td><td>ResNet feature map, H·W tokens of width 256</td><td>N ≤ 10 waypoints, six hand-built numbers each, <code>Linear(6, 64)</code></td><td><span class="pill warn">replaced</span></td></tr>
+      <tr><td>Position</td><td>Fixed 2D sine encodings, re-added at every attention layer</td><td>Learned 1D <code>nn.Embedding(10, 64)</code>, added once at the input</td><td><span class="pill warn">simplified</span></td></tr>
+      <tr><td>Encoder</td><td>6 layers, 8 heads, d = 256, FFN 2048</td><td>3 layers, 4 heads, d = 64, FFN 256</td><td><span class="pill good">kept, shrunk</span></td></tr>
+      <tr><td>Queries</td><td>100 learned object queries. Decoder input starts at zero and the queries are added inside each layer</td><td>6 learned knot queries, fed directly as the decoder input <code>tgt</code></td><td><span class="pill good">kept</span></td></tr>
+      <tr><td>Decoding</td><td>Parallel, no causal mask, one pass</td><td>Same. <code>self.decoder(queries, memory, …)</code> with no <code>tgt_mask</code></td><td><span class="pill good">kept</span></td></tr>
+      <tr><td>Variable count</td><td>Spare queries predict a "no object" class</td><td>Caller passes <code>num_knots</code>; outputs past K are sliced off</td><td><span class="pill warn">replaced</span></td></tr>
+      <tr><td>Head</td><td>Class logits plus a 3-layer MLP for 4 box numbers</td><td>2-layer MLP for one scalar per query</td><td><span class="pill good">kept, shrunk</span></td></tr>
+      <tr><td>Output structure</td><td>Unordered set. Any query may claim any object</td><td>Ordered sequence. Query i owns gap i, enforced by cumsum</td><td><span class="pill bad">opposite</span></td></tr>
+      <tr><td>Matching</td><td>Hungarian bipartite matching pairs predictions with labels</td><td>None needed. Order fixes the pairing</td><td><span class="pill bad">dropped</span></td></tr>
+      <tr><td>Loss</td><td>Cross-entropy + L1 + GIoU on labelled boxes, with auxiliary losses at each decoder layer</td><td>L1 to chordal knots, then the curve's own bending energy. No labels in Phase 2, no auxiliary losses</td><td><span class="pill bad">replaced</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="two">
+    <div class="panel card">
+      <h3>The whole borrowed mechanism is five lines</h3>
+<pre><span class="c"># src/knot_transformer.py:217, 263</span>
+self.knot_queries = nn.Embedding(max_knots, d_model)
+…
+q_idx   = torch.arange(self.max_knots, device=points.device)
+queries = self.knot_queries(q_idx).unsqueeze(0).expand(B, -1, -1)
+decoded = self.decoder(queries, memory,
+                       memory_key_padding_mask=point_mask)</pre>
+      <p class="cap">The same six vectors are broadcast to every sample in the batch. Everything input-specific arrives through cross-attention to <code>memory</code>.</p>
+    </div>
+    <div class="panel card">
+      <h3>Why the order constraint changes the story</h3>
+      <p>DETR's hardest problem is deciding which query answers for which object, and Hungarian matching exists to solve it. A knot vector is sorted by definition, so the pairing is free: the first gap is the first knot. The monotonic head turns a set-prediction architecture into a sequence predictor without making it autoregressive.</p>
+      <p>The cost is the pinned last knot above. DETR's "no object" class has no equivalent here, so the model cannot learn to leave slack at the end of the interval on its own.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== VARIANTS ===================== -->
+<section id="variants">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Variants</span>
+    <h2>Three model files, one design</h2>
+    <p>Knots live in a 1D parameter space whatever the dimension of the curve, so encoder, decoder, queries, and head never change. Only the input layer and the geometry behind the loss do.</p>
+  </div>
+  <div class="panel scroll"><table>
+    <thead><tr><th></th><th><code>KnotTransformer</code></th><th><code>KnotTransformerND</code></th><th><code>KnotTransformer3D</code></th></tr></thead>
+    <tbody>
+      <tr><td>File</td><td>knot_transformer.py</td><td>knot_transformer_nd.py</td><td>knot_transformer_3d.py</td></tr>
+      <tr><td>Input width</td><td>2 + 4 = 6</td><td>d + 4</td><td>d + 3</td></tr>
+      <tr><td>Features</td><td>chord cum, local frac, signed angle, centripetal cum</td><td>Same four. Angle is signed in 2D, unsigned <code>acos</code> for d &gt; 2</td><td>dist to previous, dist to next, unsigned angle</td></tr>
+      <tr><td>Queries / positions</td><td><code>nn.Embedding</code>, 6 and 10</td><td><code>nn.Embedding</code>, 10 and 20</td><td>Raw <code>nn.Parameter</code>, 8 and 12</td></tr>
+      <tr><td>Precision</td><td>float64</td><td>float64</td><td>PyTorch default (float32 unless changed)</td></tr>
+      <tr><td>Parameters (defaults)</td><td class="mono">353,793</td><td class="mono">354,753 at d = 3</td><td class="mono">354,049 at d = 3</td></tr>
+      <tr><td>Loss geometry</td><td><code>curvature_layer_nd</code> via the <code>curvatureLayer</code> shim</td><td><code>solve_nd</code>, <code>global_curvature_nd</code></td><td><code>bspline3d.bending_energy_batch</code></td></tr>
+      <tr><td>Extra</td><td>Both trainer classes</td><td>nD trainers, mixed-d collate with zero padding</td><td><code>warm_start_from</code>: copies a 2D checkpoint, reinitialises only <code>input_proj</code></td></tr>
+      <tr><td>Status</td><td><span class="pill good">all reported results</span></td><td><span class="pill info">smoke-tested</span></td><td><span class="pill info">3D training pending</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="col cap">The 3D warm start works because of the point above: 2D and 3D checkpoints differ only in the first linear layer. Position and query tables of different sizes are copied on their overlapping rows.</p>
+</section>
+
+<!-- ===================== TRAINING ===================== -->
+<section id="training">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Training</span>
+    <h2>Two phases: imitate a heuristic, then beat it</h2>
+    <p>Bending energy is a spiky loss. Near-coincident knots send it to infinity, and a random network produces plenty of those. So training starts by copying a safe rule of thumb and only then switches to the real objective.</p>
+  </div>
+  <div class="two">
+    <div class="panel card">
+      <span class="pill info" style="align-self:flex-start">Phase 1 · supervised</span>
+      <h3>Copy the chordal heuristic</h3>
+      <dl class="kv">
+        <dt>code</dt><dd><code>Phase1Trainer</code>, driven by <code>generalization_experiment.py</code></dd>
+        <dt>data</dt><dd>4,000 random sequences, 2,000 each at N = 4 and N = 5</dd>
+        <dt>target</dt><dd>Chordal interior knots: cumulative chord length over total</dd>
+        <dt>loss</dt><dd>L1 over the first K knots of each sample</dd>
+        <dt>optimiser</dt><dd>Adam, lr 1e-3, batch 64, grad clip 1.0, 100 epochs</dd>
+        <dt>output</dt><dd><code>phase1_generalization.pt</code>, best by training loss</dd>
+      </dl>
+      <p class="cap">Final L1 plateaus at 0.129. Most of that is the pinned last knot, which can never match its chordal target.</p>
+    </div>
+    <div class="panel card">
+      <span class="pill bad" style="align-self:flex-start">Phase 2 · self-supervised</span>
+      <h3>Minimise the curve's own energy</h3>
+      <dl class="kv">
+        <dt>code</dt><dd><code>train_phase2_longer.py</code> locally, <code>CompleteKnotTransformer_V2.ipynb</code> on GPU</dd>
+        <dt>data</dt><dd><code>dataset_1k.pt</code>: 3,187 samples whose chordal energy is under 1000</dd>
+        <dt>loss</dt><dd>Mean of min(E, 1000) over finite curves</dd>
+        <dt>optimiser</dt><dd>Adam, lr 1e-5, grad clip 1.0. Batch 64 and 200 epochs in the script; 128 and 300 in the notebook</dd>
+        <dt>selection</dt><dd>Every 5 epochs, score 200 held-out N = 6 curves. Keep the checkpoint with the lowest median model/chordal ratio</dd>
+        <dt>output</dt><dd><code>phase2_best_holdout.pt</code>, plus a per-epoch trajectory JSON</dd>
+      </dl>
+    </div>
+  </div>
+
+  <figure>
+<pre><span class="c"># experiments/train_phase2_longer.py:102–150, condensed</span>
+predicted = model(points_2d, point_mask, num_knots)
+<span class="k">for</span> n_pts, idxs <span class="k">in</span> groups.items():                    <span class="c"># one group per sequence length in the batch</span>
+    K        = n_pts - 2
+    interior = rescale_interior(predicted[idxs, :K])      <span class="c"># (0, 1] → [0.02, 0.98]</span>
+    full_kv  = torch.cat([zeros, interior, ones], dim=1)  <span class="c"># clamped cubic knot vector</span>
+    C        = cl.solve(pts_g.unsqueeze(-1), full_kv)     <span class="c"># control points from A(u) P = D</span>
+    eng      = cl.global_curvature(C, full_kv, 3, 100)    <span class="c"># one energy per curve</span>
+    eng_ok   = eng[torch.isfinite(eng)]                   <span class="c"># drop blown-up curves</span>
+    batch_energy_sum.append(torch.clamp(eng_ok, max=ENERGY_CAP).sum())   <span class="h"># cap at 1000</span>
+loss = torch.stack(batch_energy_sum).sum() / batch_n_valid
+loss.backward()                                            <span class="c"># through energy, solve, head, transformer</span>
+torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
+optim.step()</pre>
+    <figcaption>The loss the checkpoints were trained on. There is no target tensor anywhere in this loop.</figcaption>
+  </figure>
+
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <h3>Why each stabiliser is there</h3>
+    <ul>
+      <li><b>Grouping by N.</b> The solver needs every curve in a call to have the same number of points. Sorting a mixed batch into per-length groups gives one batched solve per length instead of one per sample.</li>
+      <li><b>Energy cap.</b> <code>torch.clamp(max=1000)</code> has zero gradient above the cap, so a curve with energy 50,000 contributes a constant and does not steer the update. Without it a handful of outliers own every step.</li>
+      <li><b>Chord-filtered data.</b> Training only on samples where chordal already gives E &lt; 1000 keeps the starting point inside the cap.</li>
+      <li><b>Checkpoint by held-out ratio.</b> The script's header says why: training loss and held-out generalisation diverge after about 30 epochs, so the lowest training loss is the wrong model to keep.</li>
+      <li><b>Chunked resume.</b> Each invocation runs <code>CHUNK</code> epochs and saves model, optimiser, and trajectory to one state file. The notebook does the same against Google Drive to survive Colab disconnects.</li>
+    </ul>
+  </div>
+
+  <div class="callout">
+    <h3>Two Phase 2 loops exist. Only one was used.</h3>
+    <p><code>Phase2Trainer</code> inside <code>src/knot_transformer.py</code> is the first draft: one solver call per sample, lr 1e-4, batch 512, no energy cap, no boundary rescale, a filter that keeps only samples already beating chordal, and best-by-training-energy checkpoints. Because it skips the rescale, its K-th knot is exactly 1.0 and the knot vector is degenerate. The results in the README come from <code>train_phase2_longer.py</code> and the notebooks, which fix all of that. If you extend training, start from the script.</p>
+  </div>
+</section>
+
+<!-- ===================== GEOMETRY ===================== -->
+<section id="geometry">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Geometry layer</span>
+    <h2>The loss function is a B-spline solver</h2>
+    <p><code>src/curvature_layer_nd.py</code> has no trainable weights. It is ordinary PyTorch tensor code, so autograd differentiates it. Four steps turn knots into a scalar.</p>
+  </div>
+  <div class="two">
+    <div class="panel card">
+      <h3>1 · Build A(u) <span class="cap mono">construct_A</span></h3>
+      <p>For N points the knot vector has N + 6 entries and the curve has N + 2 control points. Rows 1…N evaluate the cubic basis at the knots themselves, so data point i is interpolated at parameter u<sub>i</sub>. The first and last rows set the second derivative to zero at each end (natural end conditions).</p>
+      <h3>2 · Solve <span class="cap mono">solve_nd</span></h3>
+      <div class="eq">A(u) · P = [0, D₁, …, D_N, 0]ᵀ</div>
+      <p>Done with <code>torch.linalg.inv_ex</code> and a batched matmul per coordinate. Differentiating the inverse gives the implicit-function gradient the README quotes:</p>
+      <div class="eq">∂P/∂u_k = −A⁻¹ (∂A/∂u_k) P</div>
+    </div>
+    <div class="panel card">
+      <h3>3 · Differentiate the curve <span class="cap mono">first_/second_derivative_nd</span></h3>
+      <p>Derivatives of a B-spline are B-splines of lower degree whose control points are scaled differences. Two passes give C′ (degree 2) and C″ (degree 1), each evaluated with <code>de_boor</code>.</p>
+      <h3>4 · Integrate <span class="cap mono">global_curvature_nd</span></h3>
+      <div class="eq">κ = ‖C″ − proj_{C′} C″‖ / ‖C′‖²  E = ∫₀¹ κ² ‖C′‖ dt</div>
+      <p>The projection form of curvature works in any dimension and reduces to the familiar |x′y″ − y′x″| / ‖C′‖³ in 2D. The integral uses Simpson-style weights over 100 parameter samples.</p>
+    </div>
+  </div>
+  <p class="col">Since any valid knot vector interpolates the data exactly, there is no fit term to balance. That is why energy alone works as a loss. It is also why the loss can be gamed: a huge loop has gentle curvature. <code>src/losses.py</code> adds a buffer-box penalty on control points to stop that, and the road experiments below show it over-corrected at weight 200.</p>
+</section>
+
+<!-- ===================== RESULTS ===================== -->
+<section id="results">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Results in the repo</span>
+    <h2>What training bought</h2>
+    <p>Win rate is the share of test curves where the model's energy is at or below chordal's. The 50% line is a coin flip. The model trained on N = 4 and 5 only; everything from N = 6 up is a length it never saw.</p>
+  </div>
+  <div class="two">
+    <figure class="panel card">
+      <h3>After Phase 1 only</h3>
+      <div class="bars">
+        <div class="bar"><span>N = 4 · trained</span><div class="track"><div class="fill m" style="width:31.2%"></div><div class="mark" style="left:50%"></div></div><span class="v">31.2%</span></div>
+        <div class="bar"><span>N = 5 · trained</span><div class="track"><div class="fill m" style="width:44.6%"></div><div class="mark" style="left:50%"></div></div><span class="v">44.6%</span></div>
+        <div class="bar"><span>N = 6 · held out</span><div class="track"><div class="fill m" style="width:46.4%"></div><div class="mark" style="left:50%"></div></div><span class="v">46.4%</span></div>
+        <div class="bar"><span>N = 6 · untrained net</span><div class="track"><div class="fill m" style="width:38.2%;opacity:.5"></div><div class="mark" style="left:50%"></div></div><span class="v">38.2%</span></div>
+      </div>
+      <figcaption>500 curves per row, from <code>experiments/results/</code>. Imitating chordal cannot beat chordal. The useful signal is that held-out N = 6 behaves like trained N = 5.</figcaption>
+    </figure>
+    <figure class="panel card">
+      <h3>After Phase 2</h3>
+      <div class="bars">
+        <div class="bar"><span>N = 6 · 3-seed mean</span><div class="track"><div class="fill" style="width:75.7%"></div><div class="mark" style="left:50%"></div></div><span class="v">75.7 ± 4.0%</span></div>
+        <div class="bar"><span>N = 6 · extrapolation run</span><div class="track"><div class="fill" style="width:68%"></div><div class="mark" style="left:50%"></div></div><span class="v">68.0%</span></div>
+        <div class="bar"><span>N = 7 · two steps out</span><div class="track"><div class="fill" style="width:67.8%"></div><div class="mark" style="left:50%"></div></div><span class="v">67.8%</span></div>
+        <div class="bar"><span>N = 8 · three steps out</span><div class="track"><div class="fill" style="width:67.4%"></div><div class="mark" style="left:50%"></div></div><span class="v">67.4%</span></div>
+        <div class="bar"><span>N = 6 · hard (chordal E &gt; 1000)</span><div class="track"><div class="fill h" style="width:90.4%"></div><div class="mark" style="left:50%"></div></div><span class="v">90.4 ± 1.6%</span></div>
+      </div>
+      <figcaption>As reported in README.md. Median energy ratio on held-out N = 6 is 0.295. The raw Phase 2 result files are on Drive, not in the repo.</figcaption>
+    </figure>
+  </div>
+
+  <div class="panel scroll"><table>
+    <thead><tr><th>Follow-up experiment</th><th>Where</th><th>Finding</th><th>Standing</th></tr></thead>
+    <tbody>
+      <tr><td>L-BFGS refinement of model output</td><td><code>experiments/local_min_lbfgs/</code></td><td>Refining 97 held-out curves moves the median ratio from 0.226 to 0.217. For 81% of samples the gain is under 5%, so the model already lands near a local minimum. Random restarts win more often (90.7%) but with a worse median.</td><td><span class="pill warn">conflicts with README's Adam table</span></td></tr>
+      <tr><td>Road-like fine-tune</td><td><code>experiments/road_finetune/</code>, run 1</td><td>On 15 real GPS turns: win rate 13.3% → 26.7%, median ratio 9.64 → 1.66. Still worse than chordal.</td><td><span class="pill bad">not solved</span></td></tr>
+      <tr><td>Buffer-box penalty, λ = 200</td><td>same, run 2</td><td>Penalty dominates the loss. Win rate on real turns falls to 0%.</td><td><span class="pill bad">negative result</span></td></tr>
+      <tr><td>Trip-split real turns</td><td><code>Phase2_RealTurns_TripSplit.ipynb</code></td><td>Fixes the eval-mode dropout bug and the 15-sample selection leak. Fine-tune cell has no outputs yet.</td><td><span class="pill info">not yet run</span></td></tr>
+      <tr><td>UIUC airfoils</td><td><code>experiments/airfoil/</code></td><td>A per-curve Nelder–Mead optimiser beats chordal on 98.9% of 180 sequences, median ratio 0.676. This is the ceiling for a model on that data, not a model result.</td><td><span class="pill info">upper bound only</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===================== DRIFT ===================== -->
+<section id="drift">
+  <div class="col" style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">Docs vs code</span>
+    <h2>Where the write-ups and the source disagree</h2>
+    <p>Found while tracing the code for this page. The source is what trained the checkpoints, so this page follows the source.</p>
+  </div>
+  <div class="panel scroll"><table>
+    <thead><tr><th>Topic</th><th>docs/ARCHITECTURE.md or README says</th><th>The code does</th></tr></thead>
+    <tbody>
+      <tr><td>Knot queries</td><td>7 queries (448 params), the last a slack slot that absorbs the range up to 1.0</td><td>6 queries (384 params), no slack. <code>max_knots=6</code> in every script, and the total only comes to 353,793 with 6</td></tr>
+      <tr><td>Input features</td><td>x, y, distance to previous, distance to next, turning angle, k/N</td><td>x, y, cumulative chord, local fraction, turning angle, cumulative centripetal. The documented set matches <code>knot_transformer_3d.py</code> instead</td></tr>
+      <tr><td>FFN activation</td><td>GELU</td><td>ReLU. The layers are built without an <code>activation</code> argument. GELU appears only in the knot head</td></tr>
+      <tr><td>Per-layer parameter counts</td><td>Encoder 49,728 per layer, decoder 66,240</td><td>Encoder 49,984, decoder 66,752</td></tr>
+      <tr><td>Normalisation</td><td>Divide by c<sub>K+1</sub></td><td>Divide by <code>cum[K−1]</code>, which pins knot K to 1</td></tr>
+      <tr><td>Phase 2 batching</td><td>N-grouped batched solver</td><td>True for the script and notebooks. <code>Phase2Trainer</code> in <code>src/</code> still loops per sample</td></tr>
+      <tr><td>Paths</td><td>Quick start runs scripts from the repo root and opens <code>KnotTransformer_Phase2_v2.ipynb</code></td><td>Scripts hard-code <code>/home/claude/exp/</code> for imports, data, and outputs. That notebook name is not in <code>notebooks/</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>Built from the repository at commit 41d711d. Parameter counts and the forward-pass behaviour were checked by importing the modules under PyTorch 2.14. Phase 2 figures are quoted from the repo's README and experiment notes. DETR facts refer to Carion et al., ECCV 2020.</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const root=document.documentElement;
+const css=n=>getComputedStyle(root).getPropertyValue(n).trim();
+const $=id=>document.getElementById(id);
+
+/* ---------- B-spline maths, mirroring src/curvature_layer_nd.py ---------- */
+function fullKnots(u){return [0,0,0,0].concat(u,[1,1,1,1]);}
+function basisAll(U,p,t){
+  const m=U.length-1,B=new Array(m).fill(0);let span=-1;
+  for(let i=0;i<m;i++){if(t>=U[i]&&t<U[i+1]){span=i;break;}}
+  if(span<0){for(let i=m-1;i>=0;i--){if(U[i]<U[i+1]){span=i;break;}}}
+  if(span<0)return B.slice(0,m-p);
+  B[span]=1;
+  for(let d=1;d<=p;d++)for(let i=0;i<m-d;i++){
+    const a=U[i+d]-U[i],b=U[i+d+1]-U[i+1];
+    B[i]=(a>0?(t-U[i])/a*B[i]:0)+(b>0?(U[i+d+1]-t)/b*B[i+1]:0);
+  }
+  return B.slice(0,m-p);
+}
+function solveLin(A,R){ // A n×n, R n×2 → X n×2, or null if singular
+  const n=A.length;A=A.map(r=>r.slice());R=R.map(r=>r.slice());
+  for(let c=0;c<n;c++){
+    let p=c;for(let r=c+1;r<n;r++)if(Math.abs(A[r][c])>Math.abs(A[p][c]))p=r;
+    if(Math.abs(A[p][c])<1e-13)return null;
+    [A[c],A[p]]=[A[p],A[c]];[R[c],R[p]]=[R[p],R[c]];
+    for(let r=c+1;r<n;r++){const f=A[r][c]/A[c][c];if(!f)continue;
+      for(let k=c;k<n;k++)A[r][k]-=f*A[c][k];R[r][0]-=f*R[c][0];R[r][1]-=f*R[c][1];}
+  }
+  const X=new Array(n);
+  for(let r=n-1;r>=0;r--){let sx=R[r][0],sy=R[r][1];
+    for(let k=r+1;k<n;k++){sx-=A[r][k]*X[k][0];sy-=A[r][k]*X[k][1];}
+    X[r]=[sx/A[r][r],sy/A[r][r]];}
+  return X;
+}
+function fit(D,u){
+  const N=D.length,n=N+2,U=fullKnots(u),A=[],R=[];
+  const r0=new Array(n).fill(0);r0[0]=U[5];r0[1]=-(U[4]+U[5]);r0[2]=U[4];A.push(r0);R.push([0,0]);
+  const tau=[0].concat(u,[1]);
+  for(let i=0;i<N;i++){A.push(basisAll(U,3,tau[i]));R.push(D[i]);}
+  const rl=new Array(n).fill(0);rl[n-3]=1-U[N+1];rl[n-2]=U[N+1]+U[N]-2;rl[n-1]=1-U[N];A.push(rl);R.push([0,0]);
+  const P=solveLin(A,R);if(!P)return null;
+  const Q=[];for(let i=0;i<n-1;i++){const d=U[i+4]-U[i+1],s=d>1e-12?3/d:0;Q.push([s*(P[i+1][0]-P[i][0]),s*(P[i+1][1]-P[i][1])]);}
+  const U1=U.slice(1,-1),Rr=[];
+  for(let i=0;i<Q.length-1;i++){const d=U1[i+3]-U1[i+1],s=d>1e-12?2/d:0;Rr.push([s*(Q[i+1][0]-Q[i][0]),s*(Q[i+1][1]-Q[i][1])]);}
+  return {U,P,Q,U1,R:Rr,U2:U1.slice(1,-1)};
+}
+function dot(B,C){let x=0,y=0;for(let i=0;i<C.length;i++){x+=B[i]*C[i][0];y+=B[i]*C[i][1];}return [x,y];}
+function evalAt(f,t){return {c:dot(basisAll(f.U,3,t),f.P),d1:dot(basisAll(f.U1,2,t),f.Q),d2:dot(basisAll(f.U2,1,t),f.R)};}
+function energy(D,u){
+  const f=fit(D,u);if(!f)return Infinity;
+  const n=200,h=1/n;let s=0;
+  for(let i=0;i<=n;i++){const e=evalAt(f,Math.min(i*h,1));
+    const sp=Math.hypot(e.d1[0],e.d1[1]);if(sp<1e-9)continue;
+    const cr=e.d1[0]*e.d2[1]-e.d1[1]*e.d2[0];
+    s+=(i===0||i===n?1:(i%2?4:2))*cr*cr/Math.pow(sp,5);}
+  const E=s*h/3;return isFinite(E)?E:Infinity;
+}
+function heuristic(D,pow){
+  const L=[];for(let i=1;i<D.length;i++)L.push(Math.pow(Math.hypot(D[i][0]-D[i-1][0],D[i][1]-D[i-1][1]),pow));
+  const tot=L.reduce((a,b)=>a+b,0)||1;let c=0;const u=[];
+  for(let i=0;i<L.length-1;i++){c+=L[i];u.push(c/tot);}
+  return tidy(u);
+}
+function uniform(K){return Array.from({length:K},(_,i)=>(i+1)/(K+1));}
+const GAP=0.015,LO=0.02,HI=0.98;
+function tidy(u){u=u.slice();for(let i=0;i<u.length;i++){const lo=i?u[i-1]+GAP:LO;u[i]=Math.max(lo,Math.min(HI-(u.length-1-i)*GAP,u[i]));}return u;}
+function valid(u){if(u[0]<LO||u[u.length-1]>HI)return false;for(let i=1;i<u.length;i++)if(u[i]-u[i-1]<GAP)return false;return true;}
+
+/* ---------- bench state ---------- */
+const START={
+ 4:[[-0.4,-0.25],[-0.2,0.3],[0.15,0.2],[0.4,-0.3]],
+ 5:[[-0.42,-0.2],[-0.25,0.3],[-0.02,0.24],[0.12,-0.28],[0.42,0.02]],
+ 6:[[-0.44,-0.28],[-0.3,0.2],[-0.06,0.3],[0.04,0.2],[0.2,-0.27],[0.44,0.04]],
+ 7:[[-0.45,-0.1],[-0.33,0.28],[-0.1,0.3],[0,0.18],[0.08,-0.26],[0.3,-0.3],[0.45,0.12]],
+ 8:[[-0.46,0.05],[-0.36,0.3],[-0.16,0.28],[-0.06,0.12],[0.02,-0.25],[0.2,-0.32],[0.34,-0.1],[0.46,0.22]]
+};
+const st={pts:START[6].map(p=>p.slice()),u:[],mode:"chordal",comb:true,drag:-1};
+const cv=$("cv"),ctx=cv.getContext("2d");
+function preset(m){return m==="chordal"?heuristic(st.pts,1):m==="centripetal"?heuristic(st.pts,0.5):uniform(st.pts.length-2);}
+function setMode(m){st.mode=m;if(m!=="custom")st.u=preset(m);
+  for(const k of ["chordal","centripetal","uniform"])$("p-"+k).setAttribute("aria-pressed",String(m===k));
+  buildSliders();draw();}
+function buildSliders(){
+  const box=$("sliders");
+  if(box.children.length!==st.u.length){box.innerHTML="";
+    st.u.forEach((_,i)=>{const row=document.createElement("label");row.className="slid";row.htmlFor="knot-"+i;
+      row.innerHTML='<span>u'+(i+1)+'</span><input type="range" id="knot-'+i+'" min="0.02" max="0.98" step="0.002"><output id="knot-o-'+i+'"></output>';
+      box.appendChild(row);
+      row.querySelector("input").addEventListener("input",ev=>{const u=st.u.slice();u[i]=+ev.target.value;
+        const lo=i?u[i-1]+GAP:LO,hi=i<u.length-1?u[i+1]-GAP:HI;u[i]=Math.max(lo,Math.min(hi,u[i]));
+        st.u=u;st.mode="custom";for(const k of ["chordal","centripetal","uniform"])$("p-"+k).setAttribute("aria-pressed","false");
+        syncSliders();draw();});});}
+  syncSliders();
+}
+function syncSliders(){st.u.forEach((v,i)=>{$("knot-"+i).value=v;$("knot-o-"+i).textContent=v.toFixed(3);});}
+function fmt(e){return !isFinite(e)?"∞":e>=1000?e.toFixed(0):e>=10?e.toFixed(1):e.toFixed(2);}
+
+let W=0,H=0,S=1;
+function resize(){const r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;W=r.width;H=r.height;
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);S=Math.min(W,H-36)/1.45;draw();}
+const X=x=>W/2+x*S,Y=y=>(H-36)/2-y*S;
+function draw(){
+  if(!W)return;
+  const ink=css("--ink"),muted=css("--muted"),line=css("--line"),acc=css("--accent"),hot=css("--hot"),surf=css("--surface");
+  ctx.clearRect(0,0,W,H);
+  // training box
+  ctx.strokeStyle=line;ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.strokeRect(X(-0.5),Y(0.5),S,S);ctx.setLineDash([]);
+  ctx.fillStyle=muted;ctx.font="11px "+css("--mono");ctx.fillText("[−0.5, 0.5]² training box",X(-0.5)+4,Y(0.5)+13);
+  const f=fit(st.pts,st.u);
+  if(f){
+    const n=260,pts=[];for(let i=0;i<=n;i++)pts.push(evalAt(f,i/n));
+    if(st.comb){ctx.strokeStyle=hot;ctx.globalAlpha=.55;ctx.lineWidth=1;ctx.beginPath();const tip=[];
+      for(let i=0;i<=n;i+=2){const e=pts[i],sp=Math.hypot(e.d1[0],e.d1[1]);if(sp<1e-9)continue;
+        const k=(e.d1[0]*e.d2[1]-e.d1[1]*e.d2[0])/(sp*sp*sp),len=Math.max(-0.22,Math.min(0.22,-k*0.012));
+        const nx=-e.d1[1]/sp,ny=e.d1[0]/sp,tx=e.c[0]+nx*len,ty=e.c[1]+ny*len;
+        ctx.moveTo(X(e.c[0]),Y(e.c[1]));ctx.lineTo(X(tx),Y(ty));tip.push([tx,ty]);}
+      ctx.stroke();ctx.beginPath();tip.forEach((p,i)=>i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1])));ctx.stroke();ctx.globalAlpha=1;}
+    // control polygon
+    ctx.strokeStyle=muted;ctx.lineWidth=1;ctx.setLineDash([2,4]);ctx.beginPath();
+    f.P.forEach((p,i)=>i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1])));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=surf;ctx.strokeStyle=muted;f.P.forEach(p=>{ctx.beginPath();ctx.rect(X(p[0])-3,Y(p[1])-3,6,6);ctx.fill();ctx.stroke();});
+    // curve
+    ctx.strokeStyle=acc;ctx.lineWidth=2.6;ctx.lineJoin="round";ctx.beginPath();
+    pts.forEach((e,i)=>i?ctx.lineTo(X(e.c[0]),Y(e.c[1])):ctx.moveTo(X(e.c[0]),Y(e.c[1])));ctx.stroke();
+  }
+  // waypoints
+  st.pts.forEach((p,i)=>{ctx.beginPath();ctx.arc(X(p[0]),Y(p[1]),6,0,7);ctx.fillStyle=ink;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=surf;ctx.stroke();
+    ctx.fillStyle=muted;ctx.fillText("D"+(i+1),X(p[0])+9,Y(p[1])-8);});
+  // knot ruler
+  const x0=28,x1=W-28,y=H-20;ctx.strokeStyle=ink;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();
+  ctx.fillStyle=muted;ctx.textAlign="center";ctx.fillText("0 ×4",x0,y+14);ctx.fillText("1 ×4",x1,y+14);
+  ctx.fillStyle=ink;[0,1].forEach(v=>ctx.fillRect(x0+(x1-x0)*v-2,y-7,4,14));
+  st.u.forEach((v,i)=>{const x=x0+(x1-x0)*v;ctx.beginPath();ctx.arc(x,y,5,0,7);ctx.fillStyle=acc;ctx.fill();ctx.strokeStyle=surf;ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle=muted;ctx.fillText("u"+(i+1),x,y-10);});
+  ctx.textAlign="left";
+  // readout
+  const e=energy(st.pts,st.u),ec=energy(st.pts,heuristic(st.pts,1)),r=e/ec;
+  $("e-cur").textContent=fmt(e);$("e-chord").textContent=fmt(ec);$("e-ratio").textContent=isFinite(r)?r.toFixed(3):"–";
+  const v=$("verdict");
+  if(!isFinite(r)){v.textContent="degenerate knots";v.className="pill bad";}
+  else if(Math.abs(r-1)<0.002){v.textContent="same as chordal";v.className="pill info";}
+  else if(r<1){v.textContent="beats chordal: "+((1-r)*100).toFixed(0)+"% less bending";v.className="pill good";}
+  else{v.textContent="worse than chordal";v.className="pill bad";}
+}
+function optimise(){
+  let u=st.u.slice(),best=energy(st.pts,u),step=0.08;
+  for(let it=0;it<120&&step>2e-4;it++){let imp=false;
+    for(let i=0;i<u.length;i++)for(const s of [step,-step]){const v=u.slice();v[i]+=s;if(!valid(v))continue;
+      const e=energy(st.pts,v);if(e<best-1e-9){best=e;u=v;imp=true;}}
+    if(!imp)step*=0.5;}
+  st.u=u;setMode("custom");
+}
+function pos(ev){const r=cv.getBoundingClientRect();return [ev.clientX-r.left,ev.clientY-r.top];}
+cv.addEventListener("pointerdown",ev=>{const [mx,my]=pos(ev);let b=-1,bd=24;
+  st.pts.forEach((p,i)=>{const d=Math.hypot(X(p[0])-mx,Y(p[1])-my);if(d<bd){bd=d;b=i;}});
+  if(b>=0){st.drag=b;cv.setPointerCapture(ev.pointerId);cv.style.cursor="grabbing";}});
+cv.addEventListener("pointermove",ev=>{if(st.drag<0)return;const [mx,my]=pos(ev);
+  const c=v=>Math.max(-0.62,Math.min(0.62,v));
+  st.pts[st.drag]=[c((mx-W/2)/S),c(((H-36)/2-my)/S)];
+  if(st.mode!=="custom"){st.u=preset(st.mode);syncSliders();}draw();});
+const endDrag=()=>{st.drag=-1;cv.style.cursor="grab";};
+cv.addEventListener("pointerup",endDrag);cv.addEventListener("pointercancel",endDrag);
+for(const k of ["chordal","centripetal","uniform"])$("p-"+k).addEventListener("click",()=>setMode(k));
+$("p-opt").addEventListener("click",optimise);
+$("b-comb").addEventListener("click",ev=>{st.comb=!st.comb;ev.currentTarget.setAttribute("aria-pressed",String(st.comb));draw();});
+$("sel-n").addEventListener("change",ev=>{st.pts=START[+ev.target.value].map(p=>p.slice());setMode("chordal");});
+$("b-rand").addEventListener("click",()=>{const N=st.pts.length;let p;
+  for(let tries=0;tries<50;tries++){p=Array.from({length:N},()=>[Math.random()-0.5,Math.random()-0.5]);
+    let ok=true;for(let i=1;i<N;i++)if(Math.hypot(p[i][0]-p[i-1][0],p[i][1]-p[i-1][1])<0.08)ok=false;if(ok)break;}
+  st.pts=p;setMode("chordal");});
+
+/* ---------- output-head widget ---------- */
+const raw=[0.4,-1.2,1.0,0.2,-0.5,0.8];
+const sp=x=>Math.log1p(Math.exp(x));
+function headBuild(){const box=$("head-sl");
+  raw.forEach((v,i)=>{const row=document.createElement("label");row.className="slid";row.htmlFor="raw-"+i;
+    row.innerHTML='<span>r'+(i+1)+'</span><input type="range" id="raw-'+i+'" min="-4" max="4" step="0.05" value="'+v+'"><output id="raw-o-'+i+'"></output>';
+    box.appendChild(row);row.querySelector("input").addEventListener("input",ev=>{raw[i]=+ev.target.value;headDraw();});});
+  $("head-k").addEventListener("change",headDraw);headDraw();}
+function headDraw(){const K=+$("head-k").value,inc=raw.map(r=>sp(r)+1e-6),cum=[];inc.reduce((a,b,i)=>cum[i]=a+b,0);
+  const tot=cum[K-1];let rows="",dots='<span style="left:0%">0</span><span style="left:100%">1</span>';
+  raw.forEach((r,i)=>{$("raw-o-"+i).textContent=r.toFixed(2);const used=i<K,u=cum[i]/tot;
+    rows+='<tr style="'+(used?"":"opacity:.4")+'"><td>q'+(i+1)+(used?"":" · unused")+'</td><td class="n">'+r.toFixed(2)+'</td><td class="n">'+inc[i].toFixed(3)+'</td><td class="n">'+cum[i].toFixed(3)+'</td><td class="n">'+(used?u.toFixed(3):"–")+'</td><td class="n">'+(used?(0.02+0.96*u).toFixed(3):"–")+'</td></tr>';
+    if(used)dots+='<i class="'+(i===K-1?"pin":"")+'" style="left:'+(u*100).toFixed(2)+'%"></i>';});
+  $("head-tb").querySelector("tbody").innerHTML=rows;$("head-ruler").innerHTML=dots;}
+
+/* ---------- boot ---------- */
+headBuild();setMode("chordal");
+if(window.ResizeObserver)new ResizeObserver(resize).observe(cv);else window.addEventListener("resize",resize);
+resize();
+const mq=window.matchMedia("(prefers-color-scheme: dark)");if(mq.addEventListener)mq.addEventListener("change",draw);
+new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
+})();
+</script>

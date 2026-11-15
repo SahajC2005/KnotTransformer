@@ -1,0 +1,2402 @@
+[
+  {
+    "epoch": 1,
+    "train_loss": 407.58900570999026,
+    "raw_median": 262.50046338319595,
+    "raw_p99": 75621.78533136865,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 2,
+    "train_loss": 403.52221506889975,
+    "raw_median": 258.445427851289,
+    "raw_p99": 56074.541894862174,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 3,
+    "train_loss": 402.1323213056734,
+    "raw_median": 255.43954567071475,
+    "raw_p99": 46761.349813187415,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 4,
+    "train_loss": 407.8673509859313,
+    "raw_median": 262.4197435965033,
+    "raw_p99": 60981.649101839306,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 5,
+    "train_loss": 402.3652930243097,
+    "raw_median": 255.6732862142872,
+    "raw_p99": 67179.21182152083,
+    "holdout_win": 0.565,
+    "holdout_ratio": 0.7942336001571415
+  },
+  {
+    "epoch": 6,
+    "train_loss": 403.2939442344539,
+    "raw_median": 259.01837512647563,
+    "raw_p99": 50594.43058067482,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 7,
+    "train_loss": 407.62115321011936,
+    "raw_median": 260.1788874182402,
+    "raw_p99": 56595.08745534722,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 8,
+    "train_loss": 403.1012520712625,
+    "raw_median": 255.93846649027165,
+    "raw_p99": 45250.0695952604,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 9,
+    "train_loss": 401.0402740299844,
+    "raw_median": 256.1585683246756,
+    "raw_p99": 53981.81742370256,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 10,
+    "train_loss": 403.1323492036935,
+    "raw_median": 256.72475895818843,
+    "raw_p99": 51488.8851143579,
+    "holdout_win": 0.545,
+    "holdout_ratio": 0.8353685786698977
+  },
+  {
+    "epoch": 11,
+    "train_loss": 398.71745915830127,
+    "raw_median": 251.44928569694216,
+    "raw_p99": 48043.472132647534,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 12,
+    "train_loss": 401.13672944202426,
+    "raw_median": 256.4266671044282,
+    "raw_p99": 59495.51031172367,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 13,
+    "train_loss": 401.1122509351326,
+    "raw_median": 253.45911104120015,
+    "raw_p99": 41907.987439409706,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 14,
+    "train_loss": 398.3102289890227,
+    "raw_median": 255.2039994789333,
+    "raw_p99": 57356.53412331377,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 15,
+    "train_loss": 400.78057390008064,
+    "raw_median": 257.1229861574732,
+    "raw_p99": 63997.21933016031,
+    "holdout_win": 0.55,
+    "holdout_ratio": 0.8228278906721639
+  },
+  {
+    "epoch": 16,
+    "train_loss": 397.6766911162908,
+    "raw_median": 252.90901057489057,
+    "raw_p99": 86865.6469143277,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 17,
+    "train_loss": 397.2355360748447,
+    "raw_median": 246.8253008142115,
+    "raw_p99": 54078.50755727299,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 18,
+    "train_loss": 401.1340344289651,
+    "raw_median": 253.70115386862557,
+    "raw_p99": 67191.25600801664,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 19,
+    "train_loss": 399.0856354483747,
+    "raw_median": 256.6451298258634,
+    "raw_p99": 49341.40985527695,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 20,
+    "train_loss": 394.61342883903,
+    "raw_median": 248.88872867716356,
+    "raw_p99": 54079.0868469748,
+    "holdout_win": 0.525,
+    "holdout_ratio": 0.8163323916202531
+  },
+  {
+    "epoch": 21,
+    "train_loss": 397.31398177518565,
+    "raw_median": 248.44429371183367,
+    "raw_p99": 50844.169366139424,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 22,
+    "train_loss": 397.59053047646836,
+    "raw_median": 252.77838956047108,
+    "raw_p99": 60795.864889224766,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 23,
+    "train_loss": 399.73396911823886,
+    "raw_median": 249.86216677078036,
+    "raw_p99": 76215.6041567437,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 24,
+    "train_loss": 400.602073359077,
+    "raw_median": 251.04919954510532,
+    "raw_p99": 82924.20885639211,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 25,
+    "train_loss": 395.42808930431175,
+    "raw_median": 248.63684133608243,
+    "raw_p99": 55366.61711960909,
+    "holdout_win": 0.53,
+    "holdout_ratio": 0.727764276222458
+  },
+  {
+    "epoch": 26,
+    "train_loss": 397.05502078871757,
+    "raw_median": 251.626556656779,
+    "raw_p99": 52179.17126415684,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 27,
+    "train_loss": 396.1836782630094,
+    "raw_median": 247.56207243356843,
+    "raw_p99": 81872.71304341564,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 28,
+    "train_loss": 396.07542785723984,
+    "raw_median": 250.39037605556462,
+    "raw_p99": 65371.28366915588,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 29,
+    "train_loss": 394.7954935057846,
+    "raw_median": 244.6579247180111,
+    "raw_p99": 43551.33737506716,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 30,
+    "train_loss": 396.75397372796266,
+    "raw_median": 248.2282493153903,
+    "raw_p99": 53353.37544069916,
+    "holdout_win": 0.54,
+    "holdout_ratio": 0.7100961446767285
+  },
+  {
+    "epoch": 31,
+    "train_loss": 393.39879595549763,
+    "raw_median": 247.10872170103963,
+    "raw_p99": 48691.08895889043,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 32,
+    "train_loss": 392.7184821278099,
+    "raw_median": 244.52338020337456,
+    "raw_p99": 56427.18466121506,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 33,
+    "train_loss": 393.427680201207,
+    "raw_median": 242.21549719364987,
+    "raw_p99": 47221.54718197885,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 34,
+    "train_loss": 392.93968027422125,
+    "raw_median": 239.86236574072612,
+    "raw_p99": 69331.34722326793,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 35,
+    "train_loss": 393.9921558498237,
+    "raw_median": 246.9255735918276,
+    "raw_p99": 32797.442302247546,
+    "holdout_win": 0.525,
+    "holdout_ratio": 0.7179635221420666
+  },
+  {
+    "epoch": 36,
+    "train_loss": 394.64843741333954,
+    "raw_median": 244.1567884336522,
+    "raw_p99": 64457.40805028005,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 37,
+    "train_loss": 390.8666889529085,
+    "raw_median": 243.0548956590217,
+    "raw_p99": 52018.534841212444,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 38,
+    "train_loss": 391.1715318930253,
+    "raw_median": 248.61300235619464,
+    "raw_p99": 54242.839530740755,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 39,
+    "train_loss": 390.9199206675977,
+    "raw_median": 242.17046928174815,
+    "raw_p99": 60952.785808566055,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 40,
+    "train_loss": 386.0766247005753,
+    "raw_median": 235.96025006337607,
+    "raw_p99": 39137.23600672579,
+    "holdout_win": 0.555,
+    "holdout_ratio": 0.7040728664394416
+  },
+  {
+    "epoch": 41,
+    "train_loss": 393.71102396777644,
+    "raw_median": 241.26385939718068,
+    "raw_p99": 44361.8288975229,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 42,
+    "train_loss": 390.6210402548736,
+    "raw_median": 243.1142106011477,
+    "raw_p99": 43661.141088866905,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 43,
+    "train_loss": 390.29962000025955,
+    "raw_median": 245.2971541574936,
+    "raw_p99": 83611.16972589251,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 44,
+    "train_loss": 392.5395215864506,
+    "raw_median": 243.6273229880166,
+    "raw_p99": 71004.0456028146,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 45,
+    "train_loss": 392.829538750107,
+    "raw_median": 242.54856486562522,
+    "raw_p99": 67520.6111553389,
+    "holdout_win": 0.545,
+    "holdout_ratio": 0.6697237013436007
+  },
+  {
+    "epoch": 46,
+    "train_loss": 392.82043446343755,
+    "raw_median": 243.01685949863665,
+    "raw_p99": 36451.712076302814,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 47,
+    "train_loss": 390.99199534685715,
+    "raw_median": 247.52605151466122,
+    "raw_p99": 49049.80038056415,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 48,
+    "train_loss": 391.6797966309346,
+    "raw_median": 242.8366901245156,
+    "raw_p99": 80478.56024106855,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 49,
+    "train_loss": 388.23826009321834,
+    "raw_median": 240.05733299125208,
+    "raw_p99": 51607.24626664747,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 50,
+    "train_loss": 388.43069845796623,
+    "raw_median": 236.79184691180083,
+    "raw_p99": 80505.21102432474,
+    "holdout_win": 0.53,
+    "holdout_ratio": 0.6593252301445267
+  },
+  {
+    "epoch": 51,
+    "train_loss": 383.3628394976904,
+    "raw_median": 239.89565463289048,
+    "raw_p99": 70977.05197389644,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 52,
+    "train_loss": 387.170866695441,
+    "raw_median": 239.1018636826395,
+    "raw_p99": 57031.61358800129,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 53,
+    "train_loss": 390.9864002798543,
+    "raw_median": 245.57490774653144,
+    "raw_p99": 47811.878236911674,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 54,
+    "train_loss": 387.9633515176793,
+    "raw_median": 242.62535783101012,
+    "raw_p99": 41218.001597395465,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 55,
+    "train_loss": 387.0006180365213,
+    "raw_median": 237.65098518795685,
+    "raw_p99": 63257.695156572816,
+    "holdout_win": 0.545,
+    "holdout_ratio": 0.6718378347602905
+  },
+  {
+    "epoch": 56,
+    "train_loss": 385.9236243749269,
+    "raw_median": 239.12370706053122,
+    "raw_p99": 58136.19616463708,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 57,
+    "train_loss": 388.37446829295317,
+    "raw_median": 241.5126199472937,
+    "raw_p99": 49606.32184845703,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 58,
+    "train_loss": 383.85714866321814,
+    "raw_median": 238.2532736709605,
+    "raw_p99": 38426.56612224397,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 59,
+    "train_loss": 391.369168289829,
+    "raw_median": 242.41846056609975,
+    "raw_p99": 68181.7974486886,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 60,
+    "train_loss": 386.674950940445,
+    "raw_median": 235.87251018635968,
+    "raw_p99": 46982.80062778276,
+    "holdout_win": 0.52,
+    "holdout_ratio": 0.6885110311286239
+  },
+  {
+    "epoch": 61,
+    "train_loss": 385.8884661621051,
+    "raw_median": 234.6151199712344,
+    "raw_p99": 59708.38492075475,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 62,
+    "train_loss": 387.4899239455762,
+    "raw_median": 236.9202038688231,
+    "raw_p99": 101509.65973054642,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 63,
+    "train_loss": 383.05719751212166,
+    "raw_median": 235.91322788637606,
+    "raw_p99": 59366.66111357267,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 64,
+    "train_loss": 388.7260679238365,
+    "raw_median": 239.45653913856844,
+    "raw_p99": 48979.233442959325,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 65,
+    "train_loss": 382.72893140684585,
+    "raw_median": 232.67736868235377,
+    "raw_p99": 55047.585731523475,
+    "holdout_win": 0.515,
+    "holdout_ratio": 0.8005261557572525
+  },
+  {
+    "epoch": 66,
+    "train_loss": 385.10235706255014,
+    "raw_median": 233.03613400574184,
+    "raw_p99": 72783.723986545,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 67,
+    "train_loss": 388.3454486669464,
+    "raw_median": 236.68647505927137,
+    "raw_p99": 67254.61696968404,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 68,
+    "train_loss": 388.51151948226254,
+    "raw_median": 236.6813093163736,
+    "raw_p99": 58339.53648816242,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 69,
+    "train_loss": 381.222295815013,
+    "raw_median": 230.65475184499388,
+    "raw_p99": 33631.305449045794,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 70,
+    "train_loss": 382.49873429481136,
+    "raw_median": 230.60159328550733,
+    "raw_p99": 102768.79233765724,
+    "holdout_win": 0.525,
+    "holdout_ratio": 0.78066706239152
+  },
+  {
+    "epoch": 71,
+    "train_loss": 377.27216498091906,
+    "raw_median": 224.02094410100528,
+    "raw_p99": 51064.034367985274,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 72,
+    "train_loss": 380.9865323115038,
+    "raw_median": 224.15380541886577,
+    "raw_p99": 37175.26945791305,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 73,
+    "train_loss": 379.44801659029025,
+    "raw_median": 224.35576811280066,
+    "raw_p99": 49155.24707797783,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 74,
+    "train_loss": 379.0955404300009,
+    "raw_median": 223.95215285569185,
+    "raw_p99": 46043.89704284055,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 75,
+    "train_loss": 373.7640345942887,
+    "raw_median": 217.92683969167956,
+    "raw_p99": 61290.66795147223,
+    "holdout_win": 0.54,
+    "holdout_ratio": 0.7125181168234904
+  },
+  {
+    "epoch": 76,
+    "train_loss": 376.03822370951156,
+    "raw_median": 219.92367765169038,
+    "raw_p99": 41647.7813105571,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 77,
+    "train_loss": 370.2053414610291,
+    "raw_median": 215.72497617148514,
+    "raw_p99": 50757.89266651355,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 78,
+    "train_loss": 379.2100438927549,
+    "raw_median": 225.05555701293994,
+    "raw_p99": 54257.17670926482,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 79,
+    "train_loss": 374.00058294130315,
+    "raw_median": 218.46999638218074,
+    "raw_p99": 64873.319641481314,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 80,
+    "train_loss": 374.0454983382934,
+    "raw_median": 219.61858418648012,
+    "raw_p99": 54961.84249660857,
+    "holdout_win": 0.49,
+    "holdout_ratio": 0.7796811389474989
+  },
+  {
+    "epoch": 81,
+    "train_loss": 372.3206204922721,
+    "raw_median": 215.3656386050094,
+    "raw_p99": 66433.48466059033,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 82,
+    "train_loss": 369.9179196286087,
+    "raw_median": 216.7052940959236,
+    "raw_p99": 52920.54045154785,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 83,
+    "train_loss": 375.1472370579165,
+    "raw_median": 219.3116056746784,
+    "raw_p99": 50158.26290791051,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 84,
+    "train_loss": 371.3167725898463,
+    "raw_median": 218.98851653633167,
+    "raw_p99": 57199.31096181264,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 85,
+    "train_loss": 369.99348197838475,
+    "raw_median": 215.54980217040168,
+    "raw_p99": 38621.58827414152,
+    "holdout_win": 0.515,
+    "holdout_ratio": 0.7546929384032991
+  },
+  {
+    "epoch": 86,
+    "train_loss": 375.4307963184021,
+    "raw_median": 217.64873348856938,
+    "raw_p99": 61932.67823191195,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 87,
+    "train_loss": 367.64984467891236,
+    "raw_median": 217.79771052857353,
+    "raw_p99": 47276.12691680736,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 88,
+    "train_loss": 370.56557550152064,
+    "raw_median": 218.51404096140777,
+    "raw_p99": 158076.64686230794,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 89,
+    "train_loss": 372.17912642693204,
+    "raw_median": 214.87760195556024,
+    "raw_p99": 57740.37792673627,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 90,
+    "train_loss": 363.07716698982944,
+    "raw_median": 209.5831918638915,
+    "raw_p99": 67495.70135286491,
+    "holdout_win": 0.535,
+    "holdout_ratio": 0.6511739705863965
+  },
+  {
+    "epoch": 91,
+    "train_loss": 365.4984227488216,
+    "raw_median": 206.04014640758317,
+    "raw_p99": 49424.77751208685,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 92,
+    "train_loss": 365.4481650710815,
+    "raw_median": 210.81997608899368,
+    "raw_p99": 43179.34541242373,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 93,
+    "train_loss": 362.345200323855,
+    "raw_median": 210.09402124185473,
+    "raw_p99": 47892.097359085376,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 94,
+    "train_loss": 365.5177020526449,
+    "raw_median": 206.3964584203719,
+    "raw_p99": 59841.711379495726,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 95,
+    "train_loss": 365.7131705233459,
+    "raw_median": 212.21432141861334,
+    "raw_p99": 51469.44569350876,
+    "holdout_win": 0.545,
+    "holdout_ratio": 0.6900598766301038
+  },
+  {
+    "epoch": 96,
+    "train_loss": 362.5433351997849,
+    "raw_median": 208.3122065970286,
+    "raw_p99": 56119.990502465254,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 97,
+    "train_loss": 362.22984701218763,
+    "raw_median": 208.22058332094142,
+    "raw_p99": 50967.12935095153,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 98,
+    "train_loss": 362.73443169976406,
+    "raw_median": 203.82418428224528,
+    "raw_p99": 46115.746097594994,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 99,
+    "train_loss": 363.91570517769765,
+    "raw_median": 208.4914685859661,
+    "raw_p99": 62585.09331385231,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 100,
+    "train_loss": 362.36232453683255,
+    "raw_median": 208.63954361947387,
+    "raw_p99": 66263.3918596842,
+    "holdout_win": 0.545,
+    "holdout_ratio": 0.7404100717610193
+  },
+  {
+    "epoch": 101,
+    "train_loss": 360.7231063345017,
+    "raw_median": 202.3727311660226,
+    "raw_p99": 54567.324834452214,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 102,
+    "train_loss": 359.802622815686,
+    "raw_median": 200.83273949164516,
+    "raw_p99": 39495.278369908745,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 103,
+    "train_loss": 355.8260581773228,
+    "raw_median": 202.01042274491417,
+    "raw_p99": 51302.64618723774,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 104,
+    "train_loss": 357.08328698291575,
+    "raw_median": 202.05303530712763,
+    "raw_p99": 64335.081760663,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 105,
+    "train_loss": 355.73863443126237,
+    "raw_median": 202.23527648197322,
+    "raw_p99": 62536.0897185875,
+    "holdout_win": 0.545,
+    "holdout_ratio": 0.7660886999077412
+  },
+  {
+    "epoch": 106,
+    "train_loss": 343.5949634087444,
+    "raw_median": 196.14810110466297,
+    "raw_p99": 27654.824448026964,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 107,
+    "train_loss": 353.8546220703275,
+    "raw_median": 194.53290661675564,
+    "raw_p99": 49852.50102256034,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 108,
+    "train_loss": 354.067860281263,
+    "raw_median": 193.54914737050325,
+    "raw_p99": 120244.70487048147,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 109,
+    "train_loss": 349.7995070213809,
+    "raw_median": 195.0496272650872,
+    "raw_p99": 27270.040551681846,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 110,
+    "train_loss": 350.103387423049,
+    "raw_median": 191.8909441671097,
+    "raw_p99": 49229.579991788145,
+    "holdout_win": 0.555,
+    "holdout_ratio": 0.6675078459671534
+  },
+  {
+    "epoch": 111,
+    "train_loss": 352.36156537591904,
+    "raw_median": 190.40830190372427,
+    "raw_p99": 74588.46555639937,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 112,
+    "train_loss": 352.06680431731775,
+    "raw_median": 192.74646883298382,
+    "raw_p99": 45919.8327856297,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 113,
+    "train_loss": 350.6412833034269,
+    "raw_median": 192.88820023325312,
+    "raw_p99": 32509.604250188244,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 114,
+    "train_loss": 343.33877127684997,
+    "raw_median": 187.99136788814766,
+    "raw_p99": 48217.34104217547,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 115,
+    "train_loss": 347.28584218724677,
+    "raw_median": 186.11923740764146,
+    "raw_p99": 60349.16451153108,
+    "holdout_win": 0.56,
+    "holdout_ratio": 0.6424482648575477
+  },
+  {
+    "epoch": 116,
+    "train_loss": 351.6796085430208,
+    "raw_median": 192.58777642159166,
+    "raw_p99": 45506.82466781569,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 117,
+    "train_loss": 346.23242742646767,
+    "raw_median": 186.0252361442456,
+    "raw_p99": 44449.535085627074,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 118,
+    "train_loss": 344.59340584118536,
+    "raw_median": 187.84902918935035,
+    "raw_p99": 56635.06191675133,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 119,
+    "train_loss": 344.00543455201796,
+    "raw_median": 184.5891019044629,
+    "raw_p99": 52499.24779087293,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 120,
+    "train_loss": 343.94786964302926,
+    "raw_median": 183.19041155216965,
+    "raw_p99": 66838.37251698438,
+    "holdout_win": 0.56,
+    "holdout_ratio": 0.6388506245084982
+  },
+  {
+    "epoch": 121,
+    "train_loss": 345.37572124472376,
+    "raw_median": 184.65721291971144,
+    "raw_p99": 45494.87889309063,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 122,
+    "train_loss": 340.2540006809861,
+    "raw_median": 181.57943716338517,
+    "raw_p99": 69357.17359829023,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 123,
+    "train_loss": 338.0921550217285,
+    "raw_median": 179.27303201291875,
+    "raw_p99": 57412.620716597325,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 124,
+    "train_loss": 332.73100914365193,
+    "raw_median": 175.26681288880687,
+    "raw_p99": 39902.923008078906,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 125,
+    "train_loss": 339.98932978621065,
+    "raw_median": 177.5343439572922,
+    "raw_p99": 75371.27129372321,
+    "holdout_win": 0.53,
+    "holdout_ratio": 0.6614209004780788
+  },
+  {
+    "epoch": 126,
+    "train_loss": 338.8060759303415,
+    "raw_median": 177.70310757654738,
+    "raw_p99": 42259.814080208496,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 127,
+    "train_loss": 336.968477350411,
+    "raw_median": 174.44997873836388,
+    "raw_p99": 47636.071929030986,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 128,
+    "train_loss": 334.84300461999754,
+    "raw_median": 172.86238772804606,
+    "raw_p99": 46912.41139540233,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 129,
+    "train_loss": 332.3170824036482,
+    "raw_median": 171.05821148167425,
+    "raw_p99": 44745.50177574758,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 130,
+    "train_loss": 333.851880300966,
+    "raw_median": 171.33988650482536,
+    "raw_p99": 56262.69851027777,
+    "holdout_win": 0.55,
+    "holdout_ratio": 0.6366522418734019
+  },
+  {
+    "epoch": 131,
+    "train_loss": 330.97672212587514,
+    "raw_median": 165.93651073552527,
+    "raw_p99": 71345.3842470249,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 132,
+    "train_loss": 328.3041706444104,
+    "raw_median": 166.35436848513754,
+    "raw_p99": 35315.018269805674,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 133,
+    "train_loss": 329.71119585725137,
+    "raw_median": 167.39889805876672,
+    "raw_p99": 41746.49514096847,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 134,
+    "train_loss": 329.8931567938935,
+    "raw_median": 167.15203849014964,
+    "raw_p99": 75226.15030101739,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 135,
+    "train_loss": 325.9971298359138,
+    "raw_median": 162.67637334993452,
+    "raw_p99": 42544.90404417693,
+    "holdout_win": 0.575,
+    "holdout_ratio": 0.559495525127271
+  },
+  {
+    "epoch": 136,
+    "train_loss": 324.3117869494453,
+    "raw_median": 163.34838520123515,
+    "raw_p99": 36268.566228748976,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 137,
+    "train_loss": 325.2662427178085,
+    "raw_median": 163.1495009346322,
+    "raw_p99": 55472.21435472501,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 138,
+    "train_loss": 325.38248231823616,
+    "raw_median": 162.84429079060072,
+    "raw_p99": 54416.94688050616,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 139,
+    "train_loss": 320.8408174846363,
+    "raw_median": 161.24862306759732,
+    "raw_p99": 59654.32583865488,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 140,
+    "train_loss": 318.64518631783716,
+    "raw_median": 155.65965540235777,
+    "raw_p99": 68285.09468363128,
+    "holdout_win": 0.56,
+    "holdout_ratio": 0.6185428323437145
+  },
+  {
+    "epoch": 141,
+    "train_loss": 320.2285054933261,
+    "raw_median": 161.31622492525472,
+    "raw_p99": 34668.14387594851,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 142,
+    "train_loss": 320.56667733296314,
+    "raw_median": 159.48847323343347,
+    "raw_p99": 77045.09457723759,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 143,
+    "train_loss": 316.9760535937907,
+    "raw_median": 159.72635523668728,
+    "raw_p99": 47750.72096899258,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 144,
+    "train_loss": 318.46604123320844,
+    "raw_median": 160.69883171019856,
+    "raw_p99": 48252.822929594884,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 145,
+    "train_loss": 313.9922689312977,
+    "raw_median": 161.1298632368017,
+    "raw_p99": 43575.1426403002,
+    "holdout_win": 0.565,
+    "holdout_ratio": 0.6092134188893008
+  },
+  {
+    "epoch": 146,
+    "train_loss": 315.398442552214,
+    "raw_median": 161.25048869387223,
+    "raw_p99": 28647.361941560786,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 147,
+    "train_loss": 315.8027025534433,
+    "raw_median": 158.50865957694,
+    "raw_p99": 50063.50147601385,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 148,
+    "train_loss": 314.5145561062594,
+    "raw_median": 157.13173485755388,
+    "raw_p99": 51156.20829669566,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 149,
+    "train_loss": 310.97707641418924,
+    "raw_median": 156.15167743441663,
+    "raw_p99": 65152.56633615895,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 150,
+    "train_loss": 311.4466421425796,
+    "raw_median": 156.1245084436972,
+    "raw_p99": 50231.68956581096,
+    "holdout_win": 0.555,
+    "holdout_ratio": 0.7251449949939076
+  },
+  {
+    "epoch": 151,
+    "train_loss": 311.98280806368564,
+    "raw_median": 157.38521800604468,
+    "raw_p99": 30328.29869171319,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 152,
+    "train_loss": 310.48325859008435,
+    "raw_median": 153.48630109709646,
+    "raw_p99": 78086.96078710916,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 153,
+    "train_loss": 315.31175705742055,
+    "raw_median": 158.13221696062257,
+    "raw_p99": 50362.632709940124,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 154,
+    "train_loss": 310.0094302137922,
+    "raw_median": 159.33765366141805,
+    "raw_p99": 67026.91289750996,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 155,
+    "train_loss": 315.91324786053957,
+    "raw_median": 157.55836037984145,
+    "raw_p99": 43944.223717421904,
+    "holdout_win": 0.565,
+    "holdout_ratio": 0.6578168122333994
+  },
+  {
+    "epoch": 156,
+    "train_loss": 316.78992701663753,
+    "raw_median": 158.28884383305328,
+    "raw_p99": 74398.70008985056,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 157,
+    "train_loss": 310.1926474343202,
+    "raw_median": 153.25390386944707,
+    "raw_p99": 53987.32145684072,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 158,
+    "train_loss": 308.5322872647921,
+    "raw_median": 154.55714538224876,
+    "raw_p99": 62512.673967318224,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 159,
+    "train_loss": 312.9121558138977,
+    "raw_median": 153.29135864588952,
+    "raw_p99": 38347.64278232653,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 160,
+    "train_loss": 309.23933559625493,
+    "raw_median": 148.59346019448398,
+    "raw_p99": 50310.91036656869,
+    "holdout_win": 0.58,
+    "holdout_ratio": 0.6833644083728082
+  },
+  {
+    "epoch": 161,
+    "train_loss": 306.08506727975106,
+    "raw_median": 149.263785334853,
+    "raw_p99": 38771.31424600546,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 162,
+    "train_loss": 309.4285565006952,
+    "raw_median": 152.8131345177254,
+    "raw_p99": 43308.97215938365,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 163,
+    "train_loss": 305.25287777245154,
+    "raw_median": 154.02082523196432,
+    "raw_p99": 47189.27880278284,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 164,
+    "train_loss": 307.4541028429582,
+    "raw_median": 151.57129475225537,
+    "raw_p99": 26868.565574651293,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 165,
+    "train_loss": 317.23211862388507,
+    "raw_median": 157.6390204955286,
+    "raw_p99": 44358.818360078105,
+    "holdout_win": 0.555,
+    "holdout_ratio": 0.6921582431261472
+  },
+  {
+    "epoch": 166,
+    "train_loss": 307.9265019476079,
+    "raw_median": 151.1406220607023,
+    "raw_p99": 38692.27566336179,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 167,
+    "train_loss": 308.77240523219007,
+    "raw_median": 151.6408022691191,
+    "raw_p99": 29411.840462526674,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 168,
+    "train_loss": 307.0979542511611,
+    "raw_median": 148.77965547416426,
+    "raw_p99": 57144.97340943254,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 169,
+    "train_loss": 305.6236447409129,
+    "raw_median": 147.8466002759452,
+    "raw_p99": 46946.75152148021,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 170,
+    "train_loss": 303.9272974405852,
+    "raw_median": 145.35215789831474,
+    "raw_p99": 29161.00730695441,
+    "holdout_win": 0.545,
+    "holdout_ratio": 0.7226918422546954
+  },
+  {
+    "epoch": 171,
+    "train_loss": 305.2129593238898,
+    "raw_median": 143.38989945857577,
+    "raw_p99": 38903.7041441659,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 172,
+    "train_loss": 303.33754257812,
+    "raw_median": 145.23491185528607,
+    "raw_p99": 45171.986724391645,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 173,
+    "train_loss": 296.35674016459643,
+    "raw_median": 140.56096180180418,
+    "raw_p99": 34332.099794738206,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 174,
+    "train_loss": 302.4775637548052,
+    "raw_median": 139.94204817082854,
+    "raw_p99": 39454.87985764305,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 175,
+    "train_loss": 296.87379897108855,
+    "raw_median": 139.30116074961282,
+    "raw_p99": 51968.38521620834,
+    "holdout_win": 0.6,
+    "holdout_ratio": 0.5915615063005308
+  },
+  {
+    "epoch": 176,
+    "train_loss": 296.37097239827557,
+    "raw_median": 139.0274492351829,
+    "raw_p99": 52147.93487178876,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 177,
+    "train_loss": 292.4584654050922,
+    "raw_median": 134.87675109986893,
+    "raw_p99": 48990.82718198985,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 178,
+    "train_loss": 290.98944555447605,
+    "raw_median": 134.33194618973747,
+    "raw_p99": 23554.34009182271,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 179,
+    "train_loss": 288.8436024536528,
+    "raw_median": 133.84034426030743,
+    "raw_p99": 28007.443017036436,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 180,
+    "train_loss": 288.3081678083609,
+    "raw_median": 130.70203979369367,
+    "raw_p99": 28808.06377364496,
+    "holdout_win": 0.575,
+    "holdout_ratio": 0.6323116943557366
+  },
+  {
+    "epoch": 181,
+    "train_loss": 286.0153629288828,
+    "raw_median": 128.01845315692742,
+    "raw_p99": 34748.932114201176,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 182,
+    "train_loss": 284.88899475027057,
+    "raw_median": 126.94227183980948,
+    "raw_p99": 51444.74552246294,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 183,
+    "train_loss": 283.90425110314914,
+    "raw_median": 126.89285548767144,
+    "raw_p99": 20516.83063106352,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 184,
+    "train_loss": 281.20270507917525,
+    "raw_median": 123.35412618891839,
+    "raw_p99": 35791.414948622085,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 185,
+    "train_loss": 274.74979671275867,
+    "raw_median": 119.51902089421513,
+    "raw_p99": 31391.968263697785,
+    "holdout_win": 0.615,
+    "holdout_ratio": 0.546836873641368
+  },
+  {
+    "epoch": 186,
+    "train_loss": 274.50373944027433,
+    "raw_median": 117.44636661286694,
+    "raw_p99": 31748.868964820675,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 187,
+    "train_loss": 274.38838201008787,
+    "raw_median": 114.5821605508815,
+    "raw_p99": 25630.795898201915,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 188,
+    "train_loss": 271.83935059661025,
+    "raw_median": 112.38172835148254,
+    "raw_p99": 37375.3384173217,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 189,
+    "train_loss": 268.7386928451151,
+    "raw_median": 112.74474263257893,
+    "raw_p99": 33644.16898686085,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 190,
+    "train_loss": 264.16279468690084,
+    "raw_median": 111.53999321401133,
+    "raw_p99": 26967.89630867117,
+    "holdout_win": 0.62,
+    "holdout_ratio": 0.4937116065910501
+  },
+  {
+    "epoch": 191,
+    "train_loss": 267.01665667704765,
+    "raw_median": 107.57381420385813,
+    "raw_p99": 32577.904329386292,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 192,
+    "train_loss": 264.75801293693945,
+    "raw_median": 106.84226470028413,
+    "raw_p99": 29896.657248371674,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 193,
+    "train_loss": 261.4842998215948,
+    "raw_median": 105.31290586954198,
+    "raw_p99": 29487.550773041792,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 194,
+    "train_loss": 264.0689682583427,
+    "raw_median": 105.77723895266887,
+    "raw_p99": 29076.017479189337,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 195,
+    "train_loss": 259.8224396946392,
+    "raw_median": 104.27924155739689,
+    "raw_p99": 23087.44219293437,
+    "holdout_win": 0.625,
+    "holdout_ratio": 0.5128817887586377
+  },
+  {
+    "epoch": 196,
+    "train_loss": 258.9610620356748,
+    "raw_median": 103.89963366350224,
+    "raw_p99": 41673.81051563331,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 197,
+    "train_loss": 259.1312781711003,
+    "raw_median": 101.99868027266368,
+    "raw_p99": 18521.10566315176,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 198,
+    "train_loss": 258.96319649859225,
+    "raw_median": 103.21772332938271,
+    "raw_p99": 29049.541475488637,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 199,
+    "train_loss": 260.1334229495981,
+    "raw_median": 102.95913354607443,
+    "raw_p99": 26243.64816879174,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 200,
+    "train_loss": 258.8984996138663,
+    "raw_median": 103.20203424956914,
+    "raw_p99": 26764.336084987037,
+    "holdout_win": 0.61,
+    "holdout_ratio": 0.5591229223053938
+  },
+  {
+    "epoch": 201,
+    "train_loss": 257.87520287428475,
+    "raw_median": 102.62850009544913,
+    "raw_p99": 27969.363687986115,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 202,
+    "train_loss": 256.3053766063103,
+    "raw_median": 99.50340454123776,
+    "raw_p99": 26710.41013812477,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 203,
+    "train_loss": 258.87322285517286,
+    "raw_median": 96.75756104968488,
+    "raw_p99": 38417.071049046324,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 204,
+    "train_loss": 254.2518310649691,
+    "raw_median": 97.9911445607903,
+    "raw_p99": 20328.365249094317,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 205,
+    "train_loss": 248.55899993780952,
+    "raw_median": 96.95409864622752,
+    "raw_p99": 27048.940739592603,
+    "holdout_win": 0.645,
+    "holdout_ratio": 0.4493384309440977
+  },
+  {
+    "epoch": 206,
+    "train_loss": 251.31603922519938,
+    "raw_median": 96.80106305587474,
+    "raw_p99": 33639.92733667778,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 207,
+    "train_loss": 248.33275880387978,
+    "raw_median": 92.85235199774866,
+    "raw_p99": 31638.4067778406,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 208,
+    "train_loss": 244.26909833343132,
+    "raw_median": 90.82521389441288,
+    "raw_p99": 15774.411377352955,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 209,
+    "train_loss": 251.52973570511116,
+    "raw_median": 94.29801908518363,
+    "raw_p99": 21326.5951931221,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 210,
+    "train_loss": 244.38700302558243,
+    "raw_median": 90.75603601787012,
+    "raw_p99": 17049.149634856778,
+    "holdout_win": 0.665,
+    "holdout_ratio": 0.394048839519839
+  },
+  {
+    "epoch": 211,
+    "train_loss": 243.8209126571752,
+    "raw_median": 89.52662323358547,
+    "raw_p99": 31059.966528607798,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 212,
+    "train_loss": 241.46995849395321,
+    "raw_median": 88.99298332291988,
+    "raw_p99": 19211.439189775134,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 213,
+    "train_loss": 249.31399857757674,
+    "raw_median": 87.8756823484717,
+    "raw_p99": 41224.554359902584,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 214,
+    "train_loss": 242.98000362648338,
+    "raw_median": 90.01468411205681,
+    "raw_p99": 16761.81232543655,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 215,
+    "train_loss": 241.53054863424452,
+    "raw_median": 87.83603060746755,
+    "raw_p99": 18876.9947241164,
+    "holdout_win": 0.68,
+    "holdout_ratio": 0.39463747376783165
+  },
+  {
+    "epoch": 216,
+    "train_loss": 239.98741375813472,
+    "raw_median": 86.13495292883599,
+    "raw_p99": 29333.127078363766,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 217,
+    "train_loss": 238.70293736026957,
+    "raw_median": 83.60284041468189,
+    "raw_p99": 24461.96434862427,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 218,
+    "train_loss": 232.6433171629894,
+    "raw_median": 83.9120007680685,
+    "raw_p99": 31060.35683557378,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 219,
+    "train_loss": 241.13493725430558,
+    "raw_median": 81.94620542783638,
+    "raw_p99": 29454.17319038009,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 220,
+    "train_loss": 235.0586626594096,
+    "raw_median": 86.60249001613069,
+    "raw_p99": 15676.15707302906,
+    "holdout_win": 0.67,
+    "holdout_ratio": 0.41382463339982556
+  },
+  {
+    "epoch": 221,
+    "train_loss": 237.11167200165747,
+    "raw_median": 83.14836797285366,
+    "raw_p99": 30608.458327155313,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 222,
+    "train_loss": 235.36957249783262,
+    "raw_median": 83.60348082193822,
+    "raw_p99": 40413.14432916377,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 223,
+    "train_loss": 234.68480763949896,
+    "raw_median": 81.22565490623995,
+    "raw_p99": 21445.97752889153,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 224,
+    "train_loss": 237.19431218641375,
+    "raw_median": 83.94218360645914,
+    "raw_p99": 32157.167093079363,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 225,
+    "train_loss": 239.23205391129827,
+    "raw_median": 82.8244214558637,
+    "raw_p99": 17906.942095894537,
+    "holdout_win": 0.695,
+    "holdout_ratio": 0.40561209043061575
+  },
+  {
+    "epoch": 226,
+    "train_loss": 231.75682726323623,
+    "raw_median": 79.26840659788884,
+    "raw_p99": 16608.95216273245,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 227,
+    "train_loss": 230.06670810798568,
+    "raw_median": 81.76551277740974,
+    "raw_p99": 23000.893978290023,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 228,
+    "train_loss": 229.3900559380224,
+    "raw_median": 80.45996152143458,
+    "raw_p99": 27155.825464994567,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 229,
+    "train_loss": 228.38449391659577,
+    "raw_median": 78.59026648582055,
+    "raw_p99": 19028.29810739904,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 230,
+    "train_loss": 231.988362979348,
+    "raw_median": 77.36666849773516,
+    "raw_p99": 19457.031647134776,
+    "holdout_win": 0.66,
+    "holdout_ratio": 0.3652729789851108
+  },
+  {
+    "epoch": 231,
+    "train_loss": 223.87181508974314,
+    "raw_median": 74.26527588774088,
+    "raw_p99": 30299.812482255933,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 232,
+    "train_loss": 226.98139125489735,
+    "raw_median": 74.77058594778725,
+    "raw_p99": 18235.63956215288,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 233,
+    "train_loss": 224.37932349650694,
+    "raw_median": 75.04938419937184,
+    "raw_p99": 18721.418227985243,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 234,
+    "train_loss": 221.6749319608315,
+    "raw_median": 72.23923089783375,
+    "raw_p99": 17557.617606603013,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 235,
+    "train_loss": 218.93006482903024,
+    "raw_median": 69.24184448777649,
+    "raw_p99": 19961.006177847692,
+    "holdout_win": 0.68,
+    "holdout_ratio": 0.32862640352533334
+  },
+  {
+    "epoch": 236,
+    "train_loss": 219.60419063213942,
+    "raw_median": 67.87514671948041,
+    "raw_p99": 18098.838481576546,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 237,
+    "train_loss": 217.5133135660888,
+    "raw_median": 67.51987583002766,
+    "raw_p99": 18169.772004792005,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 238,
+    "train_loss": 212.51612158797266,
+    "raw_median": 64.6531185480749,
+    "raw_p99": 16949.090742667406,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 239,
+    "train_loss": 209.77080932266156,
+    "raw_median": 63.66259211094035,
+    "raw_p99": 29951.25824010085,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 240,
+    "train_loss": 211.02361310421173,
+    "raw_median": 65.83856329027935,
+    "raw_p99": 12786.124418028452,
+    "holdout_win": 0.715,
+    "holdout_ratio": 0.3294163294674094
+  },
+  {
+    "epoch": 241,
+    "train_loss": 212.9260317485353,
+    "raw_median": 62.52119777108167,
+    "raw_p99": 23134.852224359187,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 242,
+    "train_loss": 207.6054944232284,
+    "raw_median": 60.579403448215395,
+    "raw_p99": 21545.529280783423,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 243,
+    "train_loss": 209.95822624968926,
+    "raw_median": 61.564009822169275,
+    "raw_p99": 17729.631855009702,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 244,
+    "train_loss": 206.21165567388445,
+    "raw_median": 63.25992495365031,
+    "raw_p99": 25320.688782980964,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 245,
+    "train_loss": 205.41147973043314,
+    "raw_median": 62.4150397249085,
+    "raw_p99": 18132.377259283403,
+    "holdout_win": 0.74,
+    "holdout_ratio": 0.24909423591421315
+  },
+  {
+    "epoch": 246,
+    "train_loss": 205.87428870673048,
+    "raw_median": 60.5042172486242,
+    "raw_p99": 14247.266696873343,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 247,
+    "train_loss": 201.0725410081439,
+    "raw_median": 61.08113644531645,
+    "raw_p99": 14820.460813556723,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 248,
+    "train_loss": 200.90342894523585,
+    "raw_median": 61.38875975074624,
+    "raw_p99": 16058.17061794188,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 249,
+    "train_loss": 200.21610508132966,
+    "raw_median": 59.545443757288425,
+    "raw_p99": 19817.022650799703,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 250,
+    "train_loss": 205.6832716134694,
+    "raw_median": 58.184925881830196,
+    "raw_p99": 15913.09918963475,
+    "holdout_win": 0.695,
+    "holdout_ratio": 0.3139349202995282
+  },
+  {
+    "epoch": 251,
+    "train_loss": 204.19534825931873,
+    "raw_median": 57.50773918787123,
+    "raw_p99": 21600.316360439057,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 252,
+    "train_loss": 203.00731790846072,
+    "raw_median": 56.45131863503082,
+    "raw_p99": 23083.185258874393,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 253,
+    "train_loss": 193.9909517316711,
+    "raw_median": 52.84482744247515,
+    "raw_p99": 22910.857806986955,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 254,
+    "train_loss": 195.69418714180364,
+    "raw_median": 55.025522682627525,
+    "raw_p99": 12717.943919469177,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 255,
+    "train_loss": 190.48320962907852,
+    "raw_median": 50.17328815576901,
+    "raw_p99": 23876.327773626563,
+    "holdout_win": 0.695,
+    "holdout_ratio": 0.23585174795405225
+  },
+  {
+    "epoch": 256,
+    "train_loss": 189.86204510275874,
+    "raw_median": 52.16460928161391,
+    "raw_p99": 13144.351408133618,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 257,
+    "train_loss": 193.97450249385972,
+    "raw_median": 50.62843628317494,
+    "raw_p99": 22106.646577603875,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 258,
+    "train_loss": 188.7948484321084,
+    "raw_median": 50.65344928898306,
+    "raw_p99": 17305.899243941167,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 259,
+    "train_loss": 193.91680780026326,
+    "raw_median": 50.25121225870473,
+    "raw_p99": 13964.100360713377,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 260,
+    "train_loss": 189.2288245644691,
+    "raw_median": 51.18002691660541,
+    "raw_p99": 22180.66829545899,
+    "holdout_win": 0.72,
+    "holdout_ratio": 0.21922099123210173
+  },
+  {
+    "epoch": 261,
+    "train_loss": 194.504000371019,
+    "raw_median": 52.21585470389907,
+    "raw_p99": 18564.4724244841,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 262,
+    "train_loss": 194.0484350542703,
+    "raw_median": 51.46155548929702,
+    "raw_p99": 17206.68423594847,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 263,
+    "train_loss": 191.5635023681412,
+    "raw_median": 51.045651677112865,
+    "raw_p99": 15852.737197571101,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 264,
+    "train_loss": 193.88845585774465,
+    "raw_median": 53.21281499733147,
+    "raw_p99": 14609.223254076553,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 265,
+    "train_loss": 195.346948369033,
+    "raw_median": 54.19313057988965,
+    "raw_p99": 20508.764018689024,
+    "holdout_win": 0.72,
+    "holdout_ratio": 0.25811279359246786
+  },
+  {
+    "epoch": 266,
+    "train_loss": 193.87429249612256,
+    "raw_median": 52.84492580437551,
+    "raw_p99": 14839.153377032524,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 267,
+    "train_loss": 190.0020218222115,
+    "raw_median": 51.96309375863041,
+    "raw_p99": 23629.02804973182,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 268,
+    "train_loss": 194.56041837993914,
+    "raw_median": 52.54470617586442,
+    "raw_p99": 18342.857647290464,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 269,
+    "train_loss": 190.3720084423681,
+    "raw_median": 50.244500658160455,
+    "raw_p99": 16276.391109608687,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 270,
+    "train_loss": 193.40735959896253,
+    "raw_median": 49.713647847427204,
+    "raw_p99": 19390.765154897497,
+    "holdout_win": 0.67,
+    "holdout_ratio": 0.2588065176954847
+  },
+  {
+    "epoch": 271,
+    "train_loss": 191.49079461485636,
+    "raw_median": 49.87035229824864,
+    "raw_p99": 14954.372305126777,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 272,
+    "train_loss": 190.31485776835422,
+    "raw_median": 49.68129059604137,
+    "raw_p99": 17343.564687804075,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 273,
+    "train_loss": 181.27042633696442,
+    "raw_median": 49.190669434105864,
+    "raw_p99": 13607.8667403646,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 274,
+    "train_loss": 188.0759195393417,
+    "raw_median": 49.70311597896327,
+    "raw_p99": 11464.469003238319,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 275,
+    "train_loss": 190.47189705499102,
+    "raw_median": 48.63626822040064,
+    "raw_p99": 21735.37912038573,
+    "holdout_win": 0.7,
+    "holdout_ratio": 0.25033413032885843
+  },
+  {
+    "epoch": 276,
+    "train_loss": 192.97154941322998,
+    "raw_median": 49.6920975669762,
+    "raw_p99": 15093.19218018528,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 277,
+    "train_loss": 190.53608571617366,
+    "raw_median": 49.51427246266926,
+    "raw_p99": 16994.62659811038,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 278,
+    "train_loss": 185.17227014928022,
+    "raw_median": 45.58557068224047,
+    "raw_p99": 18339.724194253908,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 279,
+    "train_loss": 187.44336417631956,
+    "raw_median": 45.747972939116124,
+    "raw_p99": 20873.953334340964,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 280,
+    "train_loss": 181.4605342632576,
+    "raw_median": 44.48870788479743,
+    "raw_p99": 16735.90655759952,
+    "holdout_win": 0.685,
+    "holdout_ratio": 0.2649943751408148
+  },
+  {
+    "epoch": 281,
+    "train_loss": 182.88317423155874,
+    "raw_median": 43.16248844805008,
+    "raw_p99": 14217.594246169587,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 282,
+    "train_loss": 177.76894437628363,
+    "raw_median": 41.84678784695896,
+    "raw_p99": 12691.84108075569,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 283,
+    "train_loss": 179.3043357350094,
+    "raw_median": 44.06437739215382,
+    "raw_p99": 20737.231320888735,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 284,
+    "train_loss": 179.59223580352096,
+    "raw_median": 43.41583431284237,
+    "raw_p99": 12800.080239420784,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 285,
+    "train_loss": 178.49280995821377,
+    "raw_median": 44.25821121718748,
+    "raw_p99": 17309.275659335002,
+    "holdout_win": 0.71,
+    "holdout_ratio": 0.27507338202693715
+  },
+  {
+    "epoch": 286,
+    "train_loss": 181.82283761339573,
+    "raw_median": 43.98330501341749,
+    "raw_p99": 12542.964369775213,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 287,
+    "train_loss": 176.49939132858208,
+    "raw_median": 43.01947337744299,
+    "raw_p99": 15287.838279904243,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 288,
+    "train_loss": 180.4991659901445,
+    "raw_median": 44.65161647217586,
+    "raw_p99": 16623.069956133382,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 289,
+    "train_loss": 178.43911321723147,
+    "raw_median": 42.145970915471125,
+    "raw_p99": 14021.145872999525,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 290,
+    "train_loss": 183.42010884323034,
+    "raw_median": 42.1276732373162,
+    "raw_p99": 34994.58558455139,
+    "holdout_win": 0.73,
+    "holdout_ratio": 0.23629796237091477
+  },
+  {
+    "epoch": 291,
+    "train_loss": 176.3510715147998,
+    "raw_median": 41.230734588078946,
+    "raw_p99": 11377.514506006388,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 292,
+    "train_loss": 175.71904445421316,
+    "raw_median": 40.77122470020571,
+    "raw_p99": 16012.18935426619,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 293,
+    "train_loss": 178.00922538145082,
+    "raw_median": 40.71532498964563,
+    "raw_p99": 16938.605410541968,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 294,
+    "train_loss": 175.77655333697135,
+    "raw_median": 41.06534297708417,
+    "raw_p99": 11745.08272197343,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 295,
+    "train_loss": 172.72145244017685,
+    "raw_median": 38.8712659520718,
+    "raw_p99": 14073.401117999641,
+    "holdout_win": 0.705,
+    "holdout_ratio": 0.19188187470451723
+  },
+  {
+    "epoch": 296,
+    "train_loss": 174.17127918901767,
+    "raw_median": 38.87422038580775,
+    "raw_p99": 12112.372010133477,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 297,
+    "train_loss": 171.6546415854312,
+    "raw_median": 37.88363171366681,
+    "raw_p99": 14946.076218854947,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 298,
+    "train_loss": 178.23085339640193,
+    "raw_median": 38.01884367098119,
+    "raw_p99": 19483.13516386203,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 299,
+    "train_loss": 170.72862187479248,
+    "raw_median": 37.874314585769405,
+    "raw_p99": 15139.711080567095,
+    "holdout_win": NaN,
+    "holdout_ratio": NaN
+  },
+  {
+    "epoch": 300,
+    "train_loss": 174.71752604635228,
+    "raw_median": 38.60946473040737,
+    "raw_p99": 17782.391128394338,
+    "holdout_win": 0.695,
+    "holdout_ratio": 0.19357108321216632
+  }
+]

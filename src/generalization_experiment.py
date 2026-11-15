@@ -40,7 +40,7 @@ from knot_transformer import (
     build_full_knot_vector,
     device,
 )
-import curvature_layer_nd as cl
+import Curvature_Minimiser as cl
 
 
 # ---------------------------------------------------------------------------

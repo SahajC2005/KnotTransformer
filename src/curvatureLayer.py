@@ -4,7 +4,7 @@ This module re-exports the new nD implementations from curvature_layer_nd.py
 so legacy scripts such as knot_transformer.py can import the old interface.
 """
 
-from curvature_layer_nd import (
+from Curvature_Minimiser import (
     solve,
     global_curvature,
     arc,
